@@ -1,0 +1,276 @@
+{% extends 'factuai/base.html' %}
+
+{% block title %}Empresas - FactuAI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .company-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-radius: 10px;
+        overflow: hidden;
+        height: 100%;
+    }
+    .company-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .company-icon {
+        font-size: 2rem;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+    }
+    .company-count {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 50px;
+        padding: 0.25rem 0.75rem;
+        font-weight: bold;
+    }
+    .company-letter-divider {
+        position: relative;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.5rem;
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    .company-letter-divider::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 50px;
+        height: 4px;
+        background-color: var(--primary-color);
+        border-radius: 2px;
+    }
+    .company-search {
+        position: relative;
+    }
+    .company-search input {
+        padding-left: 2.5rem;
+        border-radius: 50px;
+    }
+    .company-search i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    .alphabet-filter {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+    }
+    .alphabet-filter .letter {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        background-color: #f8f9fa;
+        transition: all 0.2s;
+    }
+    .alphabet-filter .letter:hover {
+        background-color: #e9ecef;
+    }
+    .alphabet-filter .letter.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+    .no-results {
+        text-align: center;
+        padding: 2rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Empresas</h1>
+    <a href="{% url 'factuai:upload' %}" class="btn btn-primary">
+        <i class="fas fa-upload me-2"></i>Subir Facturas
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <!-- Buscador -->
+            <div class="col-md-6">
+                <div class="company-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="form-control" id="companySearch" placeholder="Buscar empresa...">
+                </div>
+            </div>
+            
+            <!-- Contador de resultados -->
+            <div class="col-md-6 text-md-end d-flex align-items-center justify-content-md-end">
+                <span class="results-count">Mostrando <span id="visibleCompanies">{{ companies|length }}</span> de {{ companies|length }} empresas</span>
+            </div>
+        </div>
+        
+        <!-- Filtro alfabético -->
+        <div class="alphabet-filter mt-3">
+            <div class="letter all active" data-letter="all">Todas</div>
+            {% for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" %}
+            <div class="letter" data-letter="{{ letter }}">{{ letter }}</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Listado de empresas -->
+<div id="companiesContainer">
+    {% if companies %}
+        {% regroup companies by company|first|upper as company_list %}
+        
+        {% for company_group in company_list %}
+            <div class="company-group" data-letter="{{ company_group.grouper }}">
+                <div class="company-letter-divider">{{ company_group.grouper }}</div>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-4">
+                    {% for company_item in company_group.list %}
+                        <div class="col">
+                            <div class="card company-card">
+                                <div class="card-body text-center position-relative">
+                                    <div class="company-count">{{ company_item.count }}</div>
+                                    <div class="company-icon bg-primary-subtle text-primary">
+                                        <i class="fas fa-building"></i>
+                                    </div>
+                                    <h5 class="card-title">{{ company_item.company }}</h5>
+                                    <p class="text-muted">{{ company_item.count }} facturas</p>
+                                    <a href="{% url 'factuai:company_detail' company_item.company %}" class="btn btn-primary">
+                                        <i class="fas fa-folder-open me-2"></i>Ver Facturas
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-results">
+            <i class="fas fa-building fa-3x mb-3 text-muted"></i>
+            <h5>No hay empresas disponibles</h5>
+            <p class="text-muted">Sube algunas facturas para comenzar</p>
+            <a href="{% url 'factuai:upload' %}" class="btn btn-primary">
+                <i class="fas fa-upload me-2"></i>Subir Facturas
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Mensaje de no resultados (oculto por defecto) -->
+<div id="noResults" class="no-results" style="display: none;">
+    <i class="fas fa-search fa-3x mb-3 text-muted"></i>
+    <h5>No se encontraron empresas</h5>
+    <p class="text-muted">Intenta con otra búsqueda</p>
+    <button class="btn btn-outline-primary" id="clearSearch">
+        <i class="fas fa-times me-2"></i>Limpiar búsqueda
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const companySearch = document.getElementById('companySearch');
+        const companiesContainer = document.getElementById('companiesContainer');
+        const noResults = document.getElementById('noResults');
+        const visibleCompaniesCounter = document.getElementById('visibleCompanies');
+        const clearSearchBtn = document.getElementById('clearSearch');
+        const alphabetFilter = document.querySelector('.alphabet-filter');
+        const companyCards = document.querySelectorAll('.company-card');
+        const companyGroups = document.querySelectorAll('.company-group');
+        const totalCompanies = {{ companies|length }};
+        
+        // Función para filtrar empresas
+        function filterCompanies() {
+            const searchTerm = companySearch.value.toLowerCase();
+            const activeLetter = document.querySelector('.letter.active').dataset.letter;
+            
+            let visibleCount = 0;
+            let visibleGroups = new Set();
+            
+            // Ocultar todos los grupos primero
+            companyGroups.forEach(group => {
+                group.style.display = 'none';
+            });
+            
+            // Filtrar cada tarjeta de empresa
+            companyCards.forEach(card => {
+                const companyName = card.querySelector('.card-title').textContent.toLowerCase();
+                const companyGroup = card.closest('.company-group');
+                const groupLetter = companyGroup.dataset.letter;
+                
+                // Verificar si cumple con ambos filtros (búsqueda y letra)
+                const matchesSearch = searchTerm === '' || companyName.includes(searchTerm);
+                const matchesLetter = activeLetter === 'all' || groupLetter === activeLetter;
+                
+                if (matchesSearch && matchesLetter) {
+                    card.closest('.col').style.display = 'block';
+                    visibleCount++;
+                    visibleGroups.add(groupLetter);
+                } else {
+                    card.closest('.col').style.display = 'none';
+                }
+            });
+            
+            // Mostrar grupos que tienen empresas visibles
+            visibleGroups.forEach(letter => {
+                document.querySelector(`.company-group[data-letter="${letter}"]`).style.display = 'block';
+            });
+            
+            // Actualizar contador
+            visibleCompaniesCounter.textContent = visibleCount;
+            
+            // Mostrar mensaje de no resultados si corresponde
+            if (visibleCount === 0) {
+                companiesContainer.style.display = 'none';
+                noResults.style.display = 'block';
+            } else {
+                companiesContainer.style.display = 'block';
+                noResults.style.display = 'none';
+            }
+        }
+        
+        // Eventos
+        companySearch.addEventListener('input', filterCompanies);
+        
+        clearSearchBtn.addEventListener('click', function() {
+            companySearch.value = '';
+            document.querySelector('.letter.active').classList.remove('active');
+            document.querySelector('.letter[data-letter="all"]').classList.add('active');
+            filterCompanies();
+        });
+        
+        alphabetFilter.addEventListener('click', function(e) {
+            if (e.target.classList.contains('letter')) {
+                // Actualizar clase active
+                document.querySelector('.letter.active').classList.remove('active');
+                e.target.classList.add('active');
+                
+                // Filtrar empresas
+                filterCompanies();
+            }
+        });
+    });
+</script>
+{% endblock %}

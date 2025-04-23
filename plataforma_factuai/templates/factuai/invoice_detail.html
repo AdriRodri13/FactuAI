@@ -1,0 +1,345 @@
+{% extends 'factuai/base.html' %}
+
+{% block title %}Factura {{ invoice.invoice_number }} - {{ invoice.company }} - FactuAI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .breadcrumb-item a {
+        text-decoration: none;
+    }
+    .breadcrumb-item.active {
+        font-weight: bold;
+    }
+    .invoice-header {
+        background-color: var(--secondary-color);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 10px;
+    }
+    .invoice-number-display {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    .invoice-image-container {
+        width: 100%;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        margin-bottom: 2rem;
+    }
+    .invoice-image {
+        width: 100%;
+        height: auto;
+    }
+    .detail-label {
+        font-weight: bold;
+        color: var(--secondary-color);
+    }
+    .detail-section {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .detail-section h3 {
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .data-row {
+        margin-bottom: 1rem;
+    }
+    .json-viewer {
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 1rem;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+    }
+    .action-buttons {
+        position: -webkit-sticky;
+        position: sticky;
+        bottom: 1rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        padding: 1rem;
+        background-color: rgba(255, 255, 255, 0.9);
+        border-radius: 10px;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        z-index: 10;
+    }
+    .ocr-text {
+        white-space: pre-wrap;
+        font-family: monospace;
+        font-size: 0.9rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .zoom-controls {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 5px;
+        padding: 0.5rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+    .zoom-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: white;
+        border: 1px solid #dee2e6;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .zoom-btn:hover {
+        background-color: var(--primary-color);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'factuai:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:company_list' %}">Empresas</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:company_detail' invoice.company %}">{{ invoice.company }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:year_detail' invoice.company invoice.invoice_date|date:'Y' %}">{{ invoice.invoice_date|date:'Y' }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:month_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' %}">{{ invoice.invoice_date|date:'F'|capfirst }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:day_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' invoice.invoice_date|date:'j' %}">{{ invoice.invoice_date|date:'j' }}</a></li>
+        <li class="breadcrumb-item active">Factura {{ invoice.invoice_number }}</li>
+    </ol>
+</nav>
+
+<!-- Cabecera de factura -->
+<div class="invoice-header text-center">
+    <div class="container">
+        <h5 class="mb-1">{{ invoice.company }}</h5>
+        <div class="invoice-number-display">{{ invoice.invoice_number }}</div>
+        <p class="mb-0">{{ invoice.invoice_date|date:"d F, Y"|capfirst }}</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Columna principal con imagen y detalles -->
+    <div class="col-lg-8">
+        <!-- Imagen de la factura -->
+        <div class="invoice-image-container position-relative" id="imageContainer">
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomIn"><i class="fas fa-search-plus"></i></button>
+                <button class="zoom-btn" id="zoomOut"><i class="fas fa-search-minus"></i></button>
+                <button class="zoom-btn" id="resetZoom"><i class="fas fa-undo"></i></button>
+            </div>
+            <img src="{{ invoice.page.image.url }}" alt="Imagen de factura" class="invoice-image" id="invoiceImage">
+        </div>
+        
+        <!-- Información detallada -->
+        <div class="detail-section">
+            <h3><i class="fas fa-info-circle me-2"></i>Información de la Factura</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Empresa</div>
+                        <div>{{ invoice.company }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Número de Factura</div>
+                        <div>{{ invoice.invoice_number }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Fecha</div>
+                        <div>{{ invoice.invoice_date|date:"d/m/Y" }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Archivo Original</div>
+                        <div>{{ document.original_filename }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Página</div>
+                        <div>{{ page.page_number }} de {{ document.pages.count }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Fecha de Procesamiento</div>
+                        <div>{{ invoice.created_at|date:"d/m/Y H:i" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Datos adicionales (Raw Data) -->
+        <div class="detail-section">
+            <h3><i class="fas fa-database me-2"></i>Datos Adicionales</h3>
+            <div class="json-viewer" id="jsonViewer">
+                <pre>{{ invoice.raw_data|pprint }}</pre>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Columna lateral con información complementaria -->
+    <div class="col-lg-4">
+        <!-- Documento original -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-file me-2"></i>Documento Original</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    {% if document.file_type == 'pdf' %}
+                        <i class="fas fa-file-pdf text-danger me-3" style="font-size: 2.5rem;"></i>
+                    {% elif document.file_type == 'jpg' or document.file_type == 'jpeg' or document.file_type == 'png' %}
+                        <i class="fas fa-file-image text-primary me-3" style="font-size: 2.5rem;"></i>
+                    {% elif document.file_type == 'zip' %}
+                        <i class="fas fa-file-archive text-warning me-3" style="font-size: 2.5rem;"></i>
+                    {% elif document.file_type == 'rar' %}
+                        <i class="fas fa-file-archive text-warning me-3" style="font-size: 2.5rem;"></i>
+                    {% else %}
+                        <i class="fas fa-file text-secondary me-3" style="font-size: 2.5rem;"></i>
+                    {% endif %}
+                    <div>
+                        <h6 class="mb-0">{{ document.original_filename }}</h6>
+                        <small class="text-muted">{{ document.file_type|upper }}</small>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="detail-label">Fecha de Subida</div>
+                    <div>{{ document.upload_date|date:"d/m/Y H:i" }}</div>
+                </div>
+                <div class="d-grid">
+                    <a href="{{ document.file.url }}" class="btn btn-primary" download>
+                        <i class="fas fa-download me-2"></i>Descargar Original
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Texto OCR -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-align-left me-2"></i>Texto OCR</h5>
+            </div>
+            <div class="card-body">
+                <div class="ocr-text">{{ page.ocr_text|default:"No hay texto OCR disponible." }}</div>
+            </div>
+        </div>
+        
+        <!-- Navegación entre páginas -->
+        {% if document.pages.count > 1 %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-copy me-2"></i>Páginas del Documento</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for doc_page in document.pages.all %}
+                        {% if doc_page.extracted_data %}
+                            <a href="{% url 'factuai:invoice_detail' doc_page.extracted_data.id %}" class="list-group-item list-group-item-action {% if doc_page.id == page.id %}active{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Página {{ doc_page.page_number }}</span>
+                                    {% if doc_page.id == page.id %}
+                                        <i class="fas fa-check-circle"></i>
+                                    {% endif %}
+                                </div>
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Botones de acción fijos -->
+<div class="action-buttons">
+    <a href="{{ document.file.url }}" class="btn btn-outline-primary" download>
+        <i class="fas fa-download me-2"></i>Descargar Original
+    </a>
+    <a href="{{ invoice.page.image.url }}" class="btn btn-outline-primary" download>
+        <i class="fas fa-image me-2"></i>Descargar Imagen
+    </a>
+    <a href="{% url 'factuai:day_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' invoice.invoice_date|date:'j' %}" class="btn btn-primary">
+        <i class="fas fa-calendar-day me-2"></i>Ver Día {{ invoice.invoice_date|date:'j' }}
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Funcionalidad de zoom para la imagen de factura
+        const imageContainer = document.getElementById('imageContainer');
+        const invoiceImage = document.getElementById('invoiceImage');
+        const zoomIn = document.getElementById('zoomIn');
+        const zoomOut = document.getElementById('zoomOut');
+        const resetZoom = document.getElementById('resetZoom');
+        
+        let scale = 1;
+        const maxScale = 3;
+        const minScale = 0.5;
+        const scaleStep = 0.2;
+        
+        // Función para aplicar zoom
+        function applyZoom() {
+            invoiceImage.style.transform = `scale(${scale})`;
+            invoiceImage.style.transformOrigin = 'top left';
+        }
+        
+        // Zoom in
+        zoomIn.addEventListener('click', function() {
+            if (scale < maxScale) {
+                scale += scaleStep;
+                applyZoom();
+            }
+        });
+        
+        // Zoom out
+        zoomOut.addEventListener('click', function() {
+            if (scale > minScale) {
+                scale -= scaleStep;
+                applyZoom();
+            }
+        });
+        
+        // Reset zoom
+        resetZoom.addEventListener('click', function() {
+            scale = 1;
+            applyZoom();
+        });
+        
+        // Formatear JSON para mejor visualización
+        const jsonViewer = document.getElementById('jsonViewer');
+        if (jsonViewer) {
+            try {
+                const jsonData = JSON.parse(jsonViewer.querySelector('pre').textContent);
+                jsonViewer.querySelector('pre').textContent = JSON.stringify(jsonData, null, 2);
+            } catch (e) {
+                // Si no es un JSON válido, dejarlo como está
+            }
+        }
+    });
+</script>
+{% endblock %}

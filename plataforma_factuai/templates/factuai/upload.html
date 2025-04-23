@@ -1,0 +1,374 @@
+{% extends 'factuai/base.html' %}
+
+{% block title %}Subir Facturas - FactuAI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-zone {
+        border: 3px dashed #ccc;
+        border-radius: 5px;
+        padding: 50px 20px;
+        text-align: center;
+        transition: all 0.3s;
+        background-color: #f9f9f9;
+        cursor: pointer;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: #3498db;
+        background-color: #e8f4fc;
+    }
+    .upload-icon {
+        font-size: 4rem;
+        color: #3498db;
+        margin-bottom: 20px;
+    }
+    .file-upload-input {
+        display: none;
+    }
+    .selected-files {
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 20px;
+    }
+    .file-item {
+        display: flex;
+        align-items: center;
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+    }
+    .file-icon {
+        font-size: 1.2rem;
+        margin-right: 10px;
+    }
+    .file-name {
+        flex-grow: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .file-remove {
+        color: #e74c3c;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+    .progress-wrapper {
+        margin-top: 20px;
+        display: none;
+    }
+    #uploadForm .btn-upload {
+        margin-top: 20px;
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-upload me-2"></i>Subir Facturas</h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> Sube tus facturas en formato PDF, JPG, PNG, ZIP o RAR. 
+                            Las facturas serán procesadas automáticamente para extraer información clave.
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="uploadForm" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="upload-zone" id="dropZone">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <h3 class="mb-3">Arrastra y suelta tus facturas aquí</h3>
+                        <p class="text-muted">o</p>
+                        <button type="button" class="btn btn-primary btn-lg" id="browseBtn">
+                            <i class="fas fa-folder-open me-2"></i>Seleccionar Archivos
+                        </button>
+                        <input type="file" name="file" id="fileInput" class="file-upload-input" multiple>
+                        <p class="mt-3 text-muted">
+                            <small>Formatos permitidos: PDF, JPG, PNG, ZIP, RAR. Tamaño máximo: 50MB</small>
+                        </p>
+                    </div>
+                    
+                    <div class="selected-files card mt-4" id="fileList" style="display: none;">
+                        <div class="card-header">
+                            <h5 class="mb-0">Archivos Seleccionados</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush" id="fileListItems">
+                                <!-- Los archivos seleccionados se mostrarán aquí -->
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-wrapper">
+                        <label class="form-label">Progreso de Subida</label>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                role="progressbar" style="width: 0%;" id="uploadProgress">0%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-success btn-lg btn-upload" id="submitBtn">
+                            <i class="fas fa-upload me-2"></i>Subir Archivos
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Información Importante</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-file-invoice text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5 class="text-center">Formatos Soportados</h5>
+                        <p class="text-center">PDF, JPG, PNG, ZIP o RAR</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-cogs text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5 class="text-center">Procesamiento Automático</h5>
+                        <p class="text-center">La IA extraerá empresa, número y fecha de factura</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-folder-open text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5 class="text-center">Organización</h5>
+                        <p class="text-center">Facturas ordenadas por empresa, año, mes y día</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const browseBtn = document.getElementById('browseBtn');
+        const fileList = document.getElementById('fileList');
+        const fileListItems = document.getElementById('fileListItems');
+        const submitBtn = document.getElementById('submitBtn');
+        const uploadForm = document.getElementById('uploadForm');
+        const progressBar = document.getElementById('uploadProgress');
+        const progressWrapper = document.querySelector('.progress-wrapper');
+        
+        // Manejar click en botón de explorar
+        browseBtn.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // Manejar cambio en input de archivo
+        fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+        
+        // Prevenir comportamiento por defecto de drag and drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        // Añadir/quitar clase para efectos visuales
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropZone.classList.add('dragover');
+        }
+        
+        function unhighlight() {
+            dropZone.classList.remove('dragover');
+        }
+        
+        // Manejar drop
+        dropZone.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        });
+        
+        // Procesar archivos
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            // Limpiar la lista
+            fileListItems.innerHTML = '';
+            
+            // Mostrar la lista y el botón de subir
+            fileList.style.display = 'block';
+            submitBtn.style.display = 'block';
+            
+            // Mostrar cada archivo en la lista
+            Array.from(files).forEach(file => {
+                // Verificar extensión
+                const ext = file.name.split('.').pop().toLowerCase();
+                const allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'zip', 'rar'];
+                
+                if (!allowedExts.includes(ext)) {
+                    showToast(`El archivo ${file.name} no es un formato permitido.`, 'danger');
+                    return;
+                }
+                
+                // Verificar tamaño
+                const maxSize = 50 * 1024 * 1024; // 50MB
+                if (file.size > maxSize) {
+                    showToast(`El archivo ${file.name} excede el tamaño máximo permitido (50MB).`, 'danger');
+                    return;
+                }
+                
+                // Mostrar en la lista
+                const fileItem = document.createElement('li');
+                fileItem.className = 'list-group-item file-item';
+                
+                // Seleccionar icono según tipo
+                let iconClass = 'fa-file';
+                if (ext === 'pdf') iconClass = 'fa-file-pdf';
+                else if (['jpg', 'jpeg', 'png'].includes(ext)) iconClass = 'fa-file-image';
+                else if (ext === 'zip') iconClass = 'fa-file-archive';
+                else if (ext === 'rar') iconClass = 'fa-file-archive';
+                
+                fileItem.innerHTML = `
+                    <i class="fas ${iconClass} file-icon"></i>
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size text-muted">${formatFileSize(file.size)}</span>
+                `;
+                
+                fileListItems.appendChild(fileItem);
+            });
+            
+            // Actualizar contador
+            updateFileCounter();
+        }
+        
+        // Formatear tamaño de archivo
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Actualizar contador de archivos
+        function updateFileCounter() {
+            const fileCount = fileInput.files.length;
+            if (fileCount > 0) {
+                const fileHeader = fileList.querySelector('.card-header h5');
+                fileHeader.textContent = `Archivos Seleccionados (${fileCount})`;
+            }
+        }
+        
+        // Manejar envío del formulario
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (fileInput.files.length === 0) {
+                showToast('Por favor, selecciona al menos un archivo para subir.', 'warning');
+                return;
+            }
+            
+            // Mostrar barra de progreso
+            progressWrapper.style.display = 'block';
+            
+            // Desactivar botón de subida
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Subiendo...';
+            
+            // Crear FormData y añadir archivos
+            const formData = new FormData(uploadForm);
+            
+            // Crear y configurar petición AJAX
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadForm.action || window.location.href, true);
+            
+            // Manejar progreso de subida
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percentComplete + '%';
+                    progressBar.textContent = percentComplete + '%';
+                }
+            });
+            
+            // Manejar respuesta
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    // Redirigir a la página que devuelve el servidor
+                    window.location.href = xhr.responseURL;
+                } else {
+                    // Mostrar error
+                    showToast('Error al subir los archivos. Por favor, inténtalo de nuevo.', 'danger');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Subir Archivos';
+                }
+            };
+            
+            // Manejar error
+            xhr.onerror = function() {
+                showToast('Error de conexión. Por favor, inténtalo de nuevo.', 'danger');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-upload me-2"></i>Subir Archivos';
+            };
+            
+            // Enviar petición
+            xhr.send(formData);
+        });
+    });
+    
+    // Función para mostrar notificaciones toast
+    function showToast(message, type = 'info') {
+        const toastContainer = document.querySelector('.toast-container');
+        const toastId = `toast-${Date.now()}`;
+        
+        const toastHTML = `
+            <div id="${toastId}" class="toast align-items-center text-white bg-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        const toastElement = document.getElementById(toastId);
+        const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+        toast.show();
+        
+        // Auto-eliminar después de ocultarse
+        toastElement.addEventListener('hidden.bs.toast', function () {
+            toastElement.remove();
+        });
+    }
+</script>
+{% endblock %}

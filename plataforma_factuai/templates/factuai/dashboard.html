@@ -1,0 +1,399 @@
+{% extends 'factuai/base.html' %}
+
+{% block title %}Dashboard - FactuAI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-radius: 10px;
+        border: none;
+        transition: transform 0.3s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-card .card-body {
+        padding: 1.5rem;
+    }
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+    }
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .doc-item {
+        transition: background-color 0.2s;
+    }
+    .doc-item:hover {
+        background-color: rgba(52, 152, 219, 0.05);
+    }
+    .doc-status-badge {
+        min-width: 100px;
+        text-align: center;
+    }
+    .company-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid rgba(0,0,0,.125);
+    }
+    .company-list-item:last-child {
+        border-bottom: none;
+    }
+    .processing-animation {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(52, 152, 219, 0.3);
+        border-radius: 50%;
+        border-top-color: #3498db;
+        animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Dashboard</h1>
+    <a href="{% url 'factuai:upload' %}" class="btn btn-primary">
+        <i class="fas fa-upload me-2"></i>Subir Facturas
+    </a>
+</div>
+
+<!-- Tarjetas de estadísticas -->
+<div class="row mb-4">
+    <!-- Total de documentos -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value">{{ total_documents }}</div>
+                        <div class="stat-label">Total Documentos</div>
+                    </div>
+                    <div class="stat-icon bg-primary-subtle text-primary">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Documentos procesados -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value">{{ processed_documents }}</div>
+                        <div class="stat-label">Procesados</div>
+                    </div>
+                    <div class="stat-icon bg-success-subtle text-success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Documentos con error -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value">{{ error_documents }}</div>
+                        <div class="stat-label">Con Errores</div>
+                    </div>
+                    <div class="stat-icon bg-danger-subtle text-danger">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Total de páginas -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="stat-value">{{ total_pages }}</div>
+                        <div class="stat-label">Total Páginas</div>
+                    </div>
+                    <div class="stat-icon bg-warning-subtle text-warning">
+                        <i class="fas fa-copy"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Documentos recientes -->
+    <div class="col-xl-8 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Documentos Recientes</h5>
+                <a href="{% url 'factuai:upload' %}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-upload me-1"></i>Subir Más
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in recent_documents %}
+                            <tr class="doc-item" data-id="{{ doc.id }}">
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if doc.file_type == 'pdf' %}
+                                            <i class="fas fa-file-pdf text-danger me-2" style="font-size: 1.2rem;"></i>
+                                        {% elif doc.file_type == 'jpg' or doc.file_type == 'jpeg' or doc.file_type == 'png' %}
+                                            <i class="fas fa-file-image text-primary me-2" style="font-size: 1.2rem;"></i>
+                                        {% elif doc.file_type == 'zip' %}
+                                            <i class="fas fa-file-archive text-warning me-2" style="font-size: 1.2rem;"></i>
+                                        {% elif doc.file_type == 'rar' %}
+                                            <i class="fas fa-file-archive text-warning me-2" style="font-size: 1.2rem;"></i>
+                                        {% else %}
+                                            <i class="fas fa-file text-secondary me-2" style="font-size: 1.2rem;"></i>
+                                        {% endif %}
+                                        <div>
+                                            <div class="fw-semibold text-truncate" style="max-width: 200px;">{{ doc.original_filename }}</div>
+                                            <small class="text-muted">{{ doc.file_type|upper }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>{{ doc.upload_date|date:"d/m/Y" }}</div>
+                                    <small class="text-muted">{{ doc.upload_date|time:"H:i" }}</small>
+                                </td>
+                                <td>
+                                    {% if doc.processed %}
+                                        <span class="badge bg-success doc-status-badge">Procesado</span>
+                                    {% elif doc.processing_error %}
+                                        <span class="badge bg-danger doc-status-badge" data-bs-toggle="tooltip" title="{{ doc.processing_error }}">Error</span>
+                                    {% else %}
+                                        <span class="badge bg-info doc-status-badge">
+                                            <div class="processing-animation me-1"></div>
+                                            Procesando
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="#" class="btn btn-sm btn-outline-secondary view-doc" data-id="{{ doc.id }}">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if doc.processing_error %}
+                                        <button class="btn btn-sm btn-outline-primary retry-doc" data-id="{{ doc.id }}">
+                                            <i class="fas fa-redo"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4">
+                                    <div class="text-muted">
+                                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                                        <p>No hay documentos recientes.</p>
+                                        <a href="{% url 'factuai:upload' %}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-upload me-1"></i>Subir Facturas
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <a href="#" class="text-decoration-none">Ver todos los documentos</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Empresas más frecuentes -->
+    <div class="col-xl-4 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-building me-2"></i>Empresas Principales</h5>
+                <a href="{% url 'factuai:company_list' %}" class="btn btn-sm btn-primary">
+                    Ver Todas
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for company in top_companies %}
+                    <li class="list-group-item company-list-item">
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-circle bg-primary-subtle text-primary me-3" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <span>{{ company.company }}</span>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">{{ company.count }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center py-4">
+                        <div class="text-muted">
+                            <i class="fas fa-building fa-3x mb-3"></i>
+                            <p>No hay empresas para mostrar.</p>
+                            <a href="{% url 'factuai:upload' %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-upload me-1"></i>Subir Facturas
+                            </a>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="card-footer text-end">
+                <a href="{% url 'factuai:company_list' %}" class="text-decoration-none">Ver todas las empresas</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Verificar estado de documentos que están en procesamiento
+        const processingDocs = document.querySelectorAll('.doc-item:has(.processing-animation)');
+        
+        if (processingDocs.length > 0) {
+            // Configurar intervalo para actualizar estado
+            setInterval(checkProcessingStatus, 5000);
+        }
+        
+        function checkProcessingStatus() {
+            processingDocs.forEach(docItem => {
+                const docId = docItem.dataset.id;
+                
+                // Realizar petición AJAX para verificar estado
+                fetch('{% url "factuai:process_status" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify({ document_id: docId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Actualizar estado en la interfaz
+                    const statusCell = docItem.querySelector('td:nth-child(3)');
+                    
+                    if (data.processed) {
+                        statusCell.innerHTML = '<span class="badge bg-success doc-status-badge">Procesado</span>';
+                    } else if (data.error) {
+                        statusCell.innerHTML = `<span class="badge bg-danger doc-status-badge" data-bs-toggle="tooltip" title="${data.error}">Error</span>`;
+                        
+                        // Añadir botón de reintentar
+                        const actionsCell = docItem.querySelector('td:nth-child(4) .btn-group');
+                        if (!actionsCell.querySelector('.retry-doc')) {
+                            actionsCell.innerHTML += `
+                                <button class="btn btn-sm btn-outline-primary retry-doc" data-id="${docId}">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            `;
+                        }
+                    } else {
+                        // Actualizar progreso si está disponible
+                        statusCell.innerHTML = `
+                            <span class="badge bg-info doc-status-badge">
+                                <div class="processing-animation me-1"></div>
+                                Procesando ${data.progress}%
+                            </span>
+                        `;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            });
+        }
+        
+        // Manejar click en botón de reintentar
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.retry-doc')) {
+                const button = e.target.closest('.retry-doc');
+                const docId = button.dataset.id;
+                
+                // Cambiar apariencia del botón
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                // Realizar petición AJAX para reintentar procesamiento
+                fetch('/api/retry-processing/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify({ document_id: docId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Actualizar estado en la interfaz
+                        const docItem = button.closest('.doc-item');
+                        const statusCell = docItem.querySelector('td:nth-child(3)');
+                        statusCell.innerHTML = `
+                            <span class="badge bg-info doc-status-badge">
+                                <div class="processing-animation me-1"></div>
+                                Procesando
+                            </span>
+                        `;
+                        
+                        // Eliminar botón de reintentar
+                        button.remove();
+                        
+                        showToast('Procesamiento reiniciado correctamente', 'success');
+                    } else {
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fas fa-redo"></i>';
+                        showToast('Error al reintentar procesamiento', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-redo"></i>';
+                    showToast('Error al reintentar procesamiento', 'danger');
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}
