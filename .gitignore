@@ -1,2 +1,4 @@
 venv/
 invoice_extractor_api/model/
+plataforma_factuai/db.sqlite3
+plataforma_factuai/media
