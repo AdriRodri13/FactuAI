@@ -22,4 +22,10 @@ urlpatterns = [
     
     # API interna para actualizar estado del procesamiento (AJAX)
     path('api/process-status/', views.process_status_view, name='process_status'),
+    
+    #Vista de acciones
+    path('dashboard/borrar/', views.eliminar_todos_datos, name='delete_invoices'),
+    
+    path('invoice/<uuid:invoice_id>/page/<int:page_number>/', views.invoice_page_view, name='invoice_page'),
+    path('api/process-invoice/', views.process_extracted_invoice, name='process_invoice'),
 ]

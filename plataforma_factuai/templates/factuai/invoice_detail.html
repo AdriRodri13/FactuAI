@@ -1,6 +1,6 @@
 {% extends 'factuai/base.html' %}
 
-{% block title %}Factura {{ invoice.invoice_number }} - {{ invoice.company }} - FactuAI{% endblock %}
+{% block title %}{% if invoice_group %}{{ invoice_group.invoice_number }}{% else %}{{ invoice.invoice_number }}{% endif %} - {{ invoice.company }} - FactuAI{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -44,7 +44,7 @@
         margin-bottom: 1.5rem;
     }
     .detail-section h3 {
-        border-bottom: 2px solid var(--primary-color);
+        border-bottom: a px solid var(--primary-color);
         padding-bottom: 0.5rem;
         margin-bottom: 1.5rem;
     }
@@ -108,6 +108,28 @@
         background-color: var(--primary-color);
         color: white;
     }
+    .page-selector {
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+    .page-item.active .page-link {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    .page-notification {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 0.75rem;
+        border-radius: 5px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+    }
+    .page-notification i {
+        font-size: 1.5rem;
+        margin-right: 0.75rem;
+    }
 </style>
 {% endblock %}
 
@@ -121,7 +143,7 @@
         <li class="breadcrumb-item"><a href="{% url 'factuai:year_detail' invoice.company invoice.invoice_date|date:'Y' %}">{{ invoice.invoice_date|date:'Y' }}</a></li>
         <li class="breadcrumb-item"><a href="{% url 'factuai:month_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' %}">{{ invoice.invoice_date|date:'F'|capfirst }}</a></li>
         <li class="breadcrumb-item"><a href="{% url 'factuai:day_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' invoice.invoice_date|date:'j' %}">{{ invoice.invoice_date|date:'j' }}</a></li>
-        <li class="breadcrumb-item active">Factura {{ invoice.invoice_number }}</li>
+        <li class="breadcrumb-item active">Factura {% if invoice_group %}{{ invoice_group.invoice_number }}{% else %}{{ invoice.invoice_number }}{% endif %}</li>
     </ol>
 </nav>
 
@@ -129,10 +151,39 @@
 <div class="invoice-header text-center">
     <div class="container">
         <h5 class="mb-1">{{ invoice.company }}</h5>
-        <div class="invoice-number-display">{{ invoice.invoice_number }}</div>
+        <div class="invoice-number-display">{% if invoice_group %}{{ invoice_group.invoice_number }}{% else %}{{ invoice.invoice_number }}{% endif %}</div>
         <p class="mb-0">{{ invoice.invoice_date|date:"d F, Y"|capfirst }}</p>
+        {% if is_grouped and pages_count > 1 %}
+        <div class="mt-2">
+            <span class="badge bg-info">{{ pages_count }} páginas</span>
+        </div>
+        {% endif %}
     </div>
 </div>
+
+{% if is_grouped and pages_count > 1 %}
+<div class="page-notification">
+    <i class="fas fa-info-circle"></i>
+    <div>
+        <strong>Factura multipágina:</strong> Esta factura tiene {{ pages_count }} páginas. Puede navegar entre ellas usando los controles a continuación.
+    </div>
+</div>
+
+<!-- Selector de páginas -->
+<div class="page-selector">
+    <nav aria-label="Navegación de páginas">
+        <ul class="pagination justify-content-center">
+            {% for page_item in invoice_pages %}
+                <li class="page-item {% if page_item.page.page_number == page.page_number %}active{% endif %}">
+                    <a class="page-link" href="{% url 'factuai:invoice_page' invoice_group.id page_item.page.page_number %}">
+                        {{ page_item.page.page_number }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </nav>
+</div>
+{% endif %}
 
 <div class="row">
     <!-- Columna principal con imagen y detalles -->
@@ -144,7 +195,7 @@
                 <button class="zoom-btn" id="zoomOut"><i class="fas fa-search-minus"></i></button>
                 <button class="zoom-btn" id="resetZoom"><i class="fas fa-undo"></i></button>
             </div>
-            <img src="{{ invoice.page.image.url }}" alt="Imagen de factura" class="invoice-image" id="invoiceImage">
+            <img src="{{ page.image.url }}" alt="Imagen de factura" class="invoice-image" id="invoiceImage">
         </div>
         
         <!-- Información detallada -->
@@ -160,7 +211,7 @@
                 <div class="col-md-6">
                     <div class="data-row">
                         <div class="detail-label">Número de Factura</div>
-                        <div>{{ invoice.invoice_number }}</div>
+                        <div>{% if invoice_group %}{{ invoice_group.invoice_number }}{% else %}{{ invoice.invoice_number }}{% endif %}</div>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -174,11 +225,10 @@
                         <div class="detail-label">Archivo Original</div>
                         <div>{{ document.original_filename }}</div>
                     </div>
-                </div>
-                <div class="col-md-6">
+                </div><div class="col-md-6">
                     <div class="data-row">
                         <div class="detail-label">Página</div>
-                        <div>{{ page.page_number }} de {{ document.pages.count }}</div>
+                        <div>{{ page.page_number }} {% if document.pages.count > 1 %}de {{ document.pages.count }}{% endif %}</div>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -247,7 +297,28 @@
         </div>
         
         <!-- Navegación entre páginas -->
-        {% if document.pages.count > 1 %}
+        {% if is_grouped and pages_count > 1 %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-copy me-2"></i>Páginas de la Factura</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for invoice_page in invoice_pages %}
+                        <a href="{% url 'factuai:invoice_page' invoice_group.id invoice_page.page.page_number %}" 
+                           class="list-group-item list-group-item-action {% if invoice_page.page.id == page.id %}active{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Página {{ invoice_page.page.page_number }}</span>
+                                {% if invoice_page.page.id == page.id %}
+                                    <i class="fas fa-check-circle"></i>
+                                {% endif %}
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% elif document.pages.count > 1 %}
         <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-copy me-2"></i>Páginas del Documento</h5>
@@ -278,7 +349,7 @@
     <a href="{{ document.file.url }}" class="btn btn-outline-primary" download>
         <i class="fas fa-download me-2"></i>Descargar Original
     </a>
-    <a href="{{ invoice.page.image.url }}" class="btn btn-outline-primary" download>
+    <a href="{{ page.image.url }}" class="btn btn-outline-primary" download>
         <i class="fas fa-image me-2"></i>Descargar Imagen
     </a>
     <a href="{% url 'factuai:day_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' invoice.invoice_date|date:'j' %}" class="btn btn-primary">

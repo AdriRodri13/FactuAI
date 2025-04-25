@@ -27,7 +27,6 @@ class ApiService:
     def __init__(self):
         """Inicializar servicio con configuración desde settings"""
         from django.conf import settings
-        import logging
         
         # Usar la URL del devtunnel con el prefijo api/
         self.base_url = 'https://rdtv0ls2-3000.uks1.devtunnels.ms/api/'
@@ -85,7 +84,9 @@ class ApiService:
             # Verificar si hay error
             response.raise_for_status()
             
-            return response.json()
+            # Procesar respuesta JSON y normalizar
+            result = response.json()
+            return self._normalize_api_result(result)
             
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error en comunicación con API: {e}")
@@ -134,7 +135,9 @@ class ApiService:
             # Verificar si hay error
             response.raise_for_status()
             
-            return response.json()
+            # Procesar y normalizar cada resultado
+            results = response.json()
+            return [self._normalize_api_result(result) for result in results]
             
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error en comunicación con API para procesamiento por lotes: {e}")
@@ -158,7 +161,47 @@ class ApiService:
                 })
             
             return results
-
+    
+    def _normalize_api_result(self, result):
+        """
+        Normaliza el resultado de la API para asegurar consistencia
+        
+        Args:
+            result: Diccionario con la respuesta de la API
+            
+        Returns:
+            dict: Resultado normalizado
+        """
+        # Asegurarse de que es un diccionario
+        if not isinstance(result, dict):
+            self.logger.warning(f"Respuesta API no es un diccionario: {result}")
+            return {
+                "ocr_id": "unknown",
+                "company": "Desconocida",
+                "invoice_number": "Sin número",
+                "invoice_date": datetime.now().strftime('%d/%m/%Y'),
+                "raw_data": {}
+            }
+        
+        # Extraer campos principales y manejar casos posibles
+        normalized = {
+            "ocr_id": result.get("ocr_id", "unknown"),
+            "company": result.get("company", result.get("empresa", "Desconocida")).lower(),
+            "invoice_number": result.get("invoice_number", result.get("numero_factura", "Sin número")),
+            "invoice_date": result.get("invoice_date", result.get("fecha_factura", datetime.now().strftime('%d/%m/%Y'))),
+            "raw_data": result.get("raw_data", {})
+        }
+        
+        # Si raw_data no existe en la respuesta, usemos la respuesta misma como raw_data
+        if not normalized["raw_data"]:
+            normalized["raw_data"] = result
+        
+        # Asegurar que raw_data sea un diccionario
+        if not isinstance(normalized["raw_data"], dict):
+            normalized["raw_data"] = {"datos": str(normalized["raw_data"])}
+        
+        return normalized
+    
 class FileProcessingService:
     """Servicio para procesar archivos subidos y extraer texto OCR"""
     
@@ -423,6 +466,7 @@ class InvoiceProcessor:
     """Orquestador para el procesamiento completo de facturas"""
     
     def __init__(self):
+        from .services import FileProcessingService, ApiService
         self.file_service = FileProcessingService()
         self.api_service = ApiService()
     
@@ -434,16 +478,7 @@ class InvoiceProcessor:
         3. Envía texto OCR a la API
         4. Guarda los resultados
         """
-        from .models import InvoicePage, ExtractedInvoice
-        from django.conf import settings
-        import os
-        import logging
-        import uuid
-        from PIL import Image
-        from pdf2image import convert_from_path
-        from datetime import datetime
-        
-        logger = logging.getLogger(__name__)
+        from .models import InvoicePage, ExtractedInvoice, InvoiceGroup
         
         try:
             # Verificar que el documento existe
@@ -460,7 +495,12 @@ class InvoiceProcessor:
             # Crear un directorio para guardar las imágenes de este documento
             media_root = settings.MEDIA_ROOT
             doc_id = str(invoice_document.id)
-            doc_dir = os.path.join(media_root, 'invoice_pages', doc_id)
+            
+            # Usar siempre año completo con 4 dígitos
+            year = str(invoice_document.upload_date.year)
+            month = str(invoice_document.upload_date.month).zfill(2)
+            
+            doc_dir = os.path.join(media_root, 'invoice_pages', year, month, doc_id)
             os.makedirs(doc_dir, exist_ok=True)
             
             # Log para depuración
@@ -479,6 +519,7 @@ class InvoiceProcessor:
                 
                 try:
                     # Convertir PDF a imágenes
+                    from pdf2image import convert_from_path
                     pages = convert_from_path(
                         file_path, 
                         300,  # DPI
@@ -498,7 +539,6 @@ class InvoiceProcessor:
                                 'page_number': page_num,
                                 'total_pages': len(pages)
                             })
-                            logger.info(f"Imagen guardada: {image_path}")
                         else:
                             logger.error(f"No se pudo guardar la imagen: {image_path}")
                 
@@ -522,7 +562,6 @@ class InvoiceProcessor:
                             'page_number': 1,
                             'total_pages': 1
                         })
-                        logger.info(f"Imagen copiada: {image_path}")
                     else:
                         logger.error(f"No se pudo copiar la imagen: {image_path}")
                 
@@ -604,8 +643,6 @@ class InvoiceProcessor:
                             "text_content": ocr_text,
                             "page": page
                         })
-                        
-                        logger.info(f"OCR completado para la página {img_data['page_number']}")
                 
                 except Exception as e:
                     logger.error(f"Error en OCR para la imagen {image_path}: {e}")
@@ -631,6 +668,9 @@ class InvoiceProcessor:
                     )
                     api_results = [single_result]
                 
+                # Lista para guardar facturas creadas
+                extracted_invoices = []
+                
                 # Procesar resultados
                 for result in api_results:
                     ocr_id = result.get("ocr_id")
@@ -641,28 +681,11 @@ class InvoiceProcessor:
                     
                     page = matching_items[0]["page"]
                     
-                    # Convertir fecha de texto a objeto date
-                    try:
-                        date_str = result.get("invoice_date", "")
-                        if date_str:
-                            # Intentar diferentes formatos de fecha
-                            invoice_date = None
-                            for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%d.%m.%Y'):
-                                try:
-                                    invoice_date = datetime.strptime(date_str, fmt).date()
-                                    break
-                                except ValueError:
-                                    continue
-                            
-                            if not invoice_date:
-                                invoice_date = datetime.now().date()
-                        else:
-                            invoice_date = datetime.now().date()
-                    except Exception:
-                        invoice_date = datetime.now().date()
+                    # Normalización de fecha: Obtener un objeto date válido de los datos de la API
+                    invoice_date = self.normalize_date(result.get("invoice_date", ""), result.get("raw_data", {}))
                     
                     # Guardar datos extraídos
-                    ExtractedInvoice.objects.create(
+                    extracted_invoice = ExtractedInvoice.objects.create(
                         page=page,
                         company=result.get("company", "Desconocida"),
                         invoice_number=result.get("invoice_number", "Sin número"),
@@ -670,13 +693,50 @@ class InvoiceProcessor:
                         raw_data=result.get("raw_data", {})
                     )
                     
-                    logger.info(f"Datos extraídos para la página {page.page_number}")
+                    extracted_invoices.append(extracted_invoice)
+                
+                # Agrupar facturas con el mismo número
+                try:
+                    # Crear un diccionario para agrupar facturas por número y empresa
+                    invoice_groups = {}
+                    
+                    for extracted_invoice in extracted_invoices:
+                        key = (extracted_invoice.company, extracted_invoice.invoice_number)
+                        if key not in invoice_groups:
+                            invoice_groups[key] = []
+                        invoice_groups[key].append(extracted_invoice)
+                    
+                    # Crear o actualizar grupos de facturas
+                    for (company, invoice_number), invoices in invoice_groups.items():
+                        if not invoices:
+                            continue
+                        
+                        # Usar la fecha de la primera factura para el grupo
+                        first_invoice = invoices[0]
+                        
+                        # Crear o recuperar el grupo
+                        invoice_group, created = InvoiceGroup.objects.get_or_create(
+                            company=company,
+                            invoice_number=invoice_number,
+                            defaults={
+                                'invoice_date': first_invoice.invoice_date
+                            }
+                        )
+                        
+                        # Asociar todas las facturas al grupo
+                        for invoice in invoices:
+                            invoice.group = invoice_group
+                            invoice.save()
+                        
+                        logger.info(f"Factura agrupada: {company} - {invoice_number} con {len(invoices)} páginas")
+                    
+                except Exception as e:
+                    logger.error(f"Error al agrupar facturas: {e}")
+                    # No interrumpir el procesamiento si falla la agrupación
                 
                 # Marcar documento como procesado
                 invoice_document.processed = True
                 invoice_document.save()
-                
-                logger.info(f"Procesamiento completado para el documento {doc_id}")
                 
             except Exception as e:
                 logger.error(f"Error en la comunicación con la API: {e}")
@@ -687,3 +747,96 @@ class InvoiceProcessor:
             logger.error(f"Error procesando documento {invoice_document.id}: {e}")
             invoice_document.processing_error = str(e)
             invoice_document.save()
+    
+    def normalize_date(self, date_str, raw_data=None):
+        """
+        Normaliza diferentes formatos de fecha para obtener un objeto date válido
+        
+        Args:
+            date_str: String con la fecha en formato desconocido
+            raw_data: Datos crudos de la API (pueden contener fechas adicionales)
+            
+        Returns:
+            datetime.date: Objeto de fecha normalizado
+        """
+        # Usar la fecha actual como fallback
+        today = datetime.now().date()
+        
+        # Si no hay fecha, devolver hoy
+        if not date_str:
+            # Intentar buscar en raw_data si está disponible
+            if raw_data and isinstance(raw_data, dict):
+                for key in ['fecha_factura', 'fecha', 'date', 'invoice_date']:
+                    if key in raw_data and raw_data[key]:
+                        date_str = raw_data[key]
+                        break
+            
+            # Si aún no hay fecha, devolver hoy
+            if not date_str:
+                return today
+        
+        # Limpiar la cadena de fecha
+        date_str = date_str.strip()
+        
+        # Lista de formatos a probar
+        formats = [
+            '%d/%m/%Y',  # 31/12/2023
+            '%Y/%m/%d',  # 2023/12/31
+            '%d-%m-%Y',  # 31-12-2023
+            '%Y-%m-%d',  # 2023-12-31
+            '%d.%m.%Y',  # 31.12.2023
+            '%Y.%m.%d',  # 2023.12.31
+            '%d %B %Y',  # 31 December 2023
+            '%B %d, %Y', # December 31, 2023
+            '%d/%m/%y',  # 31/12/23
+            '%y/%m/%d',  # 23/12/31
+        ]
+        
+        # Intentar parsing con cada formato
+        for fmt in formats:
+            try:
+                parsed_date = datetime.strptime(date_str, fmt).date()
+                
+                # Verificar que el año tiene 4 dígitos y es razonable
+                if 2000 <= parsed_date.year <= 2100:
+                    return parsed_date
+                
+                # Si el año tiene 2 dígitos (por ejemplo, 23), ajustar a 2023
+                if parsed_date.year < 100:
+                    current_century = today.year // 100 * 100
+                    adjusted_year = current_century + parsed_date.year
+                    return parsed_date.replace(year=adjusted_year)
+                
+                return parsed_date
+            except ValueError:
+                continue
+        
+        # Si no se puede parsear, intentar extraer solo el año, mes y día
+        try:
+            # Extraer números de la cadena
+            import re
+            numbers = re.findall(r'\d+', date_str)
+            
+            if len(numbers) >= 3:
+                # Suponemos que el número más grande es el año si tiene 4 dígitos
+                potential_year = max([int(n) for n in numbers if len(n) == 4], default=None)
+                
+                if potential_year and 2000 <= potential_year <= 2100:
+                    # Encontramos un año válido, buscar otros números para mes y día
+                    other_numbers = [int(n) for n in numbers if int(n) != potential_year]
+                    
+                    if len(other_numbers) >= 2:
+                        # Tomar los dos primeros como mes y día
+                        potential_month = min(max(1, other_numbers[0]), 12)  # Asegurar entre 1-12
+                        potential_day = min(max(1, other_numbers[1]), 31)    # Asegurar entre 1-31
+                        
+                        try:
+                            return datetime(potential_year, potential_month, potential_day).date()
+                        except ValueError:
+                            # Si día/mes inválido, usar el 1 como fallback
+                            return datetime(potential_year, 1, 1).date()
+        except Exception:
+            pass
+        
+        # Si todo falla, devolver la fecha actual
+        return today

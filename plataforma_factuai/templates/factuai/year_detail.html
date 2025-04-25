@@ -63,6 +63,14 @@
     .pagination-container {
         margin-top: 1.5rem;
     }
+    .pages-badge {
+        background-color: rgba(0,0,0,0.1);
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        margin-left: 0.5rem;
+    }
 </style>
 {% endblock %}
 
@@ -102,29 +110,29 @@
                 <div class="card month-card h-100">
                     <div class="month-header">
                         <div class="month-icon">
-                            {% if month_num == '1' %}
+                            {% if month_num == 1 %}
                                 <i class="fas fa-snowflake"></i>
-                            {% elif month_num == '2' %}
+                            {% elif month_num == 2 %}
                                 <i class="fas fa-heart"></i>
-                            {% elif month_num == '3' %}
+                            {% elif month_num == 3 %}
                                 <i class="fas fa-leaf"></i>
-                            {% elif month_num == '4' %}
+                            {% elif month_num == 4 %}
                                 <i class="fas fa-umbrella"></i>
-                            {% elif month_num == '5' %}
+                            {% elif month_num == 5 %}
                                 <i class="fas fa-sun"></i>
-                            {% elif month_num == '6' %}
+                            {% elif month_num == 6 %}
                                 <i class="fas fa-graduation-cap"></i>
-                            {% elif month_num == '7' %}
+                            {% elif month_num == 7 %}
                                 <i class="fas fa-umbrella-beach"></i>
-                            {% elif month_num == '8' %}
+                            {% elif month_num == 8 %}
                                 <i class="fas fa-water"></i>
-                            {% elif month_num == '9' %}
+                            {% elif month_num == 9 %}
                                 <i class="fas fa-apple-alt"></i>
-                            {% elif month_num == '10' %}
+                            {% elif month_num == 10 %}
                                 <i class="fas fa-ghost"></i>
-                            {% elif month_num == '11' %}
+                            {% elif month_num == 11 %}
                                 <i class="fas fa-cloud-rain"></i>
-                            {% elif month_num == '12' %}
+                            {% elif month_num == 12 %}
                                 <i class="fas fa-gift"></i>
                             {% endif %}
                         </div>
@@ -161,7 +169,7 @@
                         <th>Nº Factura</th>
                         <th>Fecha</th>
                         <th>Mes</th>
-                        <th>Documento</th>
+                        <th>Páginas</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -174,18 +182,11 @@
                         <td>{{ invoice.invoice_date|date:"d/m/Y" }}</td>
                         <td>{{ invoice.invoice_date|date:"F"|capfirst }}</td>
                         <td>
-                            <div class="d-flex align-items-center">
-                                {% with doc_type=invoice.page.invoice.file_type %}
-                                    {% if doc_type == 'pdf' %}
-                                        <i class="fas fa-file-pdf text-danger me-2"></i>
-                                    {% elif doc_type == 'jpg' or doc_type == 'jpeg' or doc_type == 'png' %}
-                                        <i class="fas fa-file-image text-primary me-2"></i>
-                                    {% else %}
-                                        <i class="fas fa-file text-secondary me-2"></i>
-                                    {% endif %}
-                                {% endwith %}
-                                <span class="text-truncate" style="max-width: 200px;">{{ invoice.page.invoice.original_filename }}</span>
-                            </div>
+                            {% if invoice.pages_count > 1 %}
+                                <span class="badge bg-info">{{ invoice.pages_count }} páginas</span>
+                            {% else %}
+                                <span class="badge bg-secondary">1 página</span>
+                            {% endif %}
                         </td>
                         <td>
                             <a href="{% url 'factuai:invoice_detail' invoice.id %}" class="btn btn-sm btn-primary">
