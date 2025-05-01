@@ -18,6 +18,5 @@ visualdl==2.5.3
 imgaug==0.4.0
 pycryptodome==3.20.0
 
-# PaddleOCR usa albumentations, que requiere torch
-torch==2.2.1+cpu
-albumentations==1.4.7
+
+
