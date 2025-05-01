@@ -99,14 +99,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # API Configuration
-INVOICE_API_BASE_URL = 'http://127.0.0.1:8001/api/'
+INVOICE_API_BASE_URL = 'http://localhost:8001/api'  # URL base de la API de facturas
+INVOICE_API_KEY = '1c1e88baaaca3ed8f54245cd21b487919b3ea9c7'
 INVOICE_API_TIMEOUT = 30  # segundos
 
-# Configuración de autenticación para la API
-# Puedes usar uno de estos métodos de autenticación según lo que requiera tu API
-INVOICE_API_KEY = 'tu_api_key_aqui'  # Para autenticación con token Bearer 
-INVOICE_API_USERNAME = 'usuario_api'  # Para autenticación básica
-INVOICE_API_PASSWORD = 'contraseña_api'
 
 # Configuración para procesamiento de archivos
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB máximo para subida de archivos
