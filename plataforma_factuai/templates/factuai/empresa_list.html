@@ -1,0 +1,532 @@
+{% extends 'factuai/base.html' %}
+{% load static %}
+
+{% block title %}Empresas - FactuAI{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/empresa_list.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- Cabecera de página -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="section-title">Gestión de Empresas</h1>
+                <p class="section-subtitle">Visualiza, busca y administra todas las empresas registradas en el sistema, con acceso directo a sus facturas.</p>
+            </div>
+            <div class="col-lg-4 text-lg-end text-center mt-4 mt-lg-0">
+                <a href="{% url 'factuai:upload' %}" class="upload-btn">
+                    <i class="fas fa-upload"></i>Subir Facturas
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenedor principal -->
+<!-- Contenedor principal -->
+<div class="container">
+    <div class="companies-container">
+        {% if facturas_pendientes %}
+        <!-- Sección de facturas pendientes -->
+        <div class="filter-card mb-4">
+            <div class="card-body p-4">
+                <div class="pending-header">
+                    <div class="pending-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Facturas pendientes de asignación
+                        <span class="pending-badge">{{ facturas_pendientes }} pendientes</span>
+                    </div>
+                    <a href="{% url 'factuai:facturas_pendientes' %}" class="btn btn-warning btn-sm">
+                        <i class="fas fa-tasks me-2"></i>Revisar facturas
+                    </a>
+                </div>
+                <p class="text-muted mb-0">
+                    Hay facturas que necesitan ser asignadas a una empresa. Revísalas para mantener tu sistema organizado.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Sección de filtros y búsqueda con botón de nueva empresa -->
+        <div class="filter-card">
+            <div class="card-body p-4">
+                <div class="row g-3 align-items-center">
+                    <!-- Buscador -->
+                    <div class="col-md-6">
+                        <div class="search-container mb-0">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" class="search-input" id="companySearch" placeholder="Buscar empresa por nombre...">
+                        </div>
+                    </div>
+                    
+                    <!-- Botón de nueva empresa y contador de resultados -->
+                    <div class="col-md-6 text-md-end text-center">
+                        <button class="btn btn-primary btn-add-floating me-3" data-bs-toggle="modal" data-bs-target="#addCompanyModal">
+                            <i class="fas fa-plus me-2"></i>Nueva empresa
+                        </button>
+                        <div class="results-counter d-inline-block mt-3 mt-md-0">
+                            <i class="fas fa-building me-2"></i>
+                            Mostrando <strong id="visibleCompanies">{{ empresas|length }}</strong> de <strong>{{ empresas|length }}</strong> empresas
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Listado de empresas -->
+        <div id="companiesContainer" class="mt-4">
+            {% if empresas %}
+                <div class="companies-grid">
+                    {% for empresa in empresas %}
+                        <div class="company-item" data-company="{{ empresa.nombre|lower }}" style="animation-delay: {{ forloop.counter0|divisibleby:3 }}00ms">
+                            <div class="company-card">
+                                <div class="company-header">
+                                    <div class="company-icon text-primary">
+                                        <i class="fas fa-building"></i>
+                                    </div>
+                                    <div class="company-count">{{ empresa.facturas_count }} factura{{ empresa.facturas_count|pluralize }}</div>
+                                    <h3 class="company-name">{{ empresa.nombre }}</h3>
+                                    <div class="company-details">
+                                        <i class="fas fa-file-invoice"></i>
+                                        <span>{{ empresa.facturas_count }} documento{{ empresa.facturas_count|pluralize }} registrado{{ empresa.facturas_count|pluralize }}</span>
+                                    </div>
+                                    
+                                    {% if empresa.nif %}
+                                    <div class="company-details">
+                                        <i class="fas fa-id-card"></i>
+                                        <span>NIF: {{ empresa.nif }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="company-footer">
+                                    <div class="d-flex gap-2">
+                                        <a href="{% url 'factuai:empresa_detalle' empresa.id %}" class="btn btn-primary btn-view flex-fill">
+                                            <i class="fas fa-info-circle me-2"></i>Ver Detalle
+                                        </a>
+                                        <a href="{% url 'factuai:empresa_facturas' empresa.id %}" class="btn btn-outline-primary btn-view-invoices flex-fill">
+                                            <i class="fas fa-file-invoice me-2"></i>Ver Facturas
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="no-results">
+                    <i class="fas fa-building"></i>
+                    <h4>No hay empresas disponibles</h4>
+                    <p>Aún no has creado ninguna empresa en el sistema. Puedes crear empresas manualmente o subir facturas para que se detecten automáticamente.</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCompanyModal">
+                            <i class="fas fa-plus me-2"></i>Crear empresa
+                        </button>
+                        <a href="{% url 'factuai:upload' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-upload me-2"></i>Subir facturas
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Mensaje de no resultados (oculto por defecto) -->
+        <div id="noResults" class="no-results" style="display: none;">
+            <i class="fas fa-search"></i>
+            <h4>No se encontraron empresas</h4>
+            <p>No existen empresas que coincidan con tu búsqueda. Intenta con otro término o revisa tu filtro.</p>
+            <button class="btn btn-outline" id="clearSearch">
+                <i class="fas fa-times me-2"></i>Limpiar búsqueda
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para añadir empresa -->
+<div class="modal fade" id="addCompanyModal" tabindex="-1" aria-labelledby="addCompanyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addCompanyModalLabel">Añadir nueva empresa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCompanyForm">
+                    <div class="mb-3">
+                        <label for="companyName" class="form-label">Nombre de la empresa *</label>
+                        <input type="text" class="form-control" id="companyName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="companyNif" class="form-label">NIF</label>
+                        <input type="text" class="form-control" id="companyNif">
+                    </div>
+                    <div class="mb-3">
+                        <label for="companyAddress" class="form-label">Dirección</label>
+                        <input type="text" class="form-control" id="companyAddress">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="companyPhone" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" id="companyPhone">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="companyEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="companyEmail">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveCompanyBtn">Guardar empresa</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    const companySearch = document.getElementById('companySearch');
+    const companiesContainer = document.getElementById('companiesContainer');
+    const noResults = document.getElementById('noResults');
+    const visibleCompaniesCounter = document.getElementById('visibleCompanies');
+    const clearSearchBtn = document.getElementById('clearSearch');
+    const companyItems = document.querySelectorAll('.company-item');
+    const totalCompanies = {{ empresas|length }};
+    const addCompanyModal = document.getElementById('addCompanyModal');
+    
+    // Configuración personalizada para el modal sin backdrop
+    if (addCompanyModal) {
+        // Configurar para que el modal no tenga backdrop
+        addCompanyModal.addEventListener('show.bs.modal', function() {
+            // Eliminar la clase modal-open del body para evitar el padding-right automático
+            setTimeout(function() {
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = 'auto';
+                document.body.style.paddingRight = '0';
+                
+                // Eliminar cualquier backdrop existente
+                document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+                    backdrop.remove();
+                });
+            }, 0);
+        });
+        
+        // Al abrir el modal manualmente, asegurarse de que no tenga backdrop
+        const modalTriggers = document.querySelectorAll('[data-bs-toggle="modal"][data-bs-target="#addCompanyModal"]');
+        modalTriggers.forEach(function(trigger) {
+            trigger.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Cerrar cualquier instancia existente del modal
+                const existingModal = bootstrap.Modal.getInstance(addCompanyModal);
+                if (existingModal) {
+                    existingModal.dispose();
+                }
+                
+                // Crear y abrir una nueva instancia sin backdrop
+                const modal = new bootstrap.Modal(addCompanyModal, {
+                    backdrop: false,
+                    keyboard: true
+                });
+                
+                modal.show();
+                
+                // Eliminar el backdrop después de abrir el modal
+                setTimeout(function() {
+                    document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+                        backdrop.remove();
+                    });
+                    
+                    // Asegurar que el body no tenga ninguna clase o estilo que bloquee la interacción
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = 'auto';
+                    document.body.style.paddingRight = '0';
+                    
+                    // Asegurarse de que el modal esté por encima
+                    addCompanyModal.style.zIndex = '1060';
+                }, 50);
+                
+                return false;
+            });
+        });
+        
+        // Manejar el cierre del modal correctamente
+        document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(function(closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                const modal = bootstrap.Modal.getInstance(addCompanyModal);
+                if (modal) {
+                    modal.hide();
+                }
+                
+                // Asegurarse de eliminar cualquier backdrop residual
+                document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+                    backdrop.remove();
+                });
+                
+                // Restaurar el scrolling
+                document.body.style.overflow = 'auto';
+            });
+        });
+    }
+    
+    // Animación de entrada para las tarjetas
+    companyItems.forEach((item, index) => {
+        item.style.opacity = '0';
+        setTimeout(() => {
+            item.style.opacity = '1';
+        }, 100 * (index % 5)); // Escalonamos las animaciones
+    });
+    
+    // Función para filtrar empresas
+    function filterCompanies() {
+        const searchTerm = companySearch.value.toLowerCase().trim();
+        let visibleCount = 0;
+        
+        // Filtrar cada empresa
+        companyItems.forEach(item => {
+            if (!item.dataset.company) {
+                // El botón de añadir siempre visible
+                return;
+            }
+            
+            const companyName = item.dataset.company;
+            
+            if (searchTerm === '' || companyName.includes(searchTerm)) {
+                item.style.display = 'block';
+                visibleCount++;
+                
+                // Aplicar animación solo a elementos recién visibles
+                if (item.classList.contains('hidden')) {
+                    item.classList.remove('hidden');
+                    item.style.animation = 'fadeIn 0.3s ease forwards';
+                }
+            } else {
+                item.style.display = 'none';
+                item.classList.add('hidden');
+            }
+        });
+        
+        // Actualizar contador con animación
+        const currentCount = parseInt(visibleCompaniesCounter.textContent);
+        if (currentCount !== visibleCount) {
+            // Animación simple para el contador
+            visibleCompaniesCounter.style.transform = 'scale(1.2)';
+            visibleCompaniesCounter.style.color = '#4361ee';
+            setTimeout(() => {
+                visibleCompaniesCounter.textContent = visibleCount;
+                setTimeout(() => {
+                    visibleCompaniesCounter.style.transform = 'scale(1)';
+                    visibleCompaniesCounter.style.color = '';
+                }, 200);
+            }, 200);
+        } else {
+            visibleCompaniesCounter.textContent = visibleCount;
+        }
+        
+        // Mostrar mensaje de no resultados si corresponde
+        if (visibleCount === 0) {
+            companiesContainer.style.display = 'none';
+            noResults.style.display = 'block';
+            noResults.style.animation = 'fadeIn 0.3s ease forwards';
+        } else {
+            companiesContainer.style.display = 'block';
+            noResults.style.display = 'none';
+        }
+    }
+    
+    // Eventos
+    companySearch.addEventListener('input', filterCompanies);
+    
+    clearSearchBtn.addEventListener('click', function() {
+        companySearch.value = '';
+        filterCompanies();
+        // Enfoque en el campo de búsqueda
+        companySearch.focus();
+    });
+    
+    // Feedback visual al hacer clic en la tarjeta
+    companyItems.forEach(item => {
+        const card = item.querySelector('.company-card');
+        if (card) {
+            card.addEventListener('mousedown', function() {
+                this.style.transform = 'translateY(-4px)';
+            });
+            card.addEventListener('mouseup', function() {
+                this.style.transform = '';
+            });
+        }
+    });
+
+    // Funcionalidad para guardar nueva empresa
+    const saveCompanyBtn = document.getElementById('saveCompanyBtn');
+    const addCompanyForm = document.getElementById('addCompanyForm');
+    
+    if (saveCompanyBtn) {
+        saveCompanyBtn.addEventListener('click', function() {
+            // Validar formulario
+            if (!addCompanyForm.checkValidity()) {
+                addCompanyForm.reportValidity();
+                return;
+            }
+            
+            // Obtener datos del formulario
+            const nombre = document.getElementById('companyName').value;
+            const nif = document.getElementById('companyNif').value;
+            const direccion = document.getElementById('companyAddress').value;
+            const telefono = document.getElementById('companyPhone').value;
+            const email = document.getElementById('companyEmail').value;
+            
+            // Desactivar botón durante procesamiento
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Guardando...';
+            
+            // Enviar datos al servidor
+            fetch('{% url "factuai:empresa_create" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    nombre: nombre,
+                    nif: nif,
+                    direccion: direccion,
+                    telefono: telefono,
+                    email: email
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensaje de éxito
+                    showToast('Empresa creada con éxito', 'success');
+                    
+                    // Cerrar modal
+                    const modal = bootstrap.Modal.getInstance(addCompanyModal);
+                    if (modal) {
+                        modal.hide();
+                    } else {
+                        // Cerrar manualmente si no se puede obtener la instancia
+                        addCompanyModal.style.display = 'none';
+                        // Asegurarse de eliminar cualquier backdrop
+                        document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+                    }
+                    
+                    // Recargar página
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    // Mostrar error
+                    showToast(data.error || 'Error al crear la empresa', 'error');
+                    // Restaurar botón
+                    this.disabled = false;
+                    this.innerHTML = 'Guardar empresa';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error al crear la empresa', 'error');
+                // Restaurar botón
+                this.disabled = false;
+                this.innerHTML = 'Guardar empresa';
+            });
+        });
+    }
+    
+    // Función para obtener CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Función para mostrar notificaciones toast
+    function showToast(message, type = 'info') {
+        const toastContainer = document.querySelector('.toast-container') || createToastContainer();
+        
+        const toastEl = document.createElement('div');
+        toastEl.className = `toast align-items-center border-0 text-white bg-${type === 'error' ? 'danger' : type}`;
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        
+        toastEl.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        
+        toastContainer.appendChild(toastEl);
+        
+        const toast = new bootstrap.Toast(toastEl, {
+            autohide: true,
+            delay: 3000
+        });
+        
+        toast.show();
+        
+        // Eliminar toast del DOM después de ocultarse
+        toastEl.addEventListener('hidden.bs.toast', function() {
+            toastEl.remove();
+        });
+    }
+    
+    // Función para crear el contenedor de toasts si no existe
+    function createToastContainer() {
+        const container = document.createElement('div');
+        container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(container);
+        return container;
+    }
+    
+    // Agregar estilos CSS para eliminar cualquier backdrop
+    const style = document.createElement('style');
+    style.textContent = `
+        .modal-backdrop {
+            display: none !important;
+        }
+        
+        body.modal-open {
+            overflow: auto !important;
+            padding-right: 0 !important;
+        }
+        
+        #addCompanyModal {
+            background-color: rgba(0, 0, 0, 0) !important;
+            pointer-events: auto !important;
+        }
+        
+        #addCompanyModal .modal-dialog {
+            pointer-events: auto !important;
+            z-index: 1070 !important;
+        }
+        
+        #addCompanyModal .modal-content {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            border: none;
+            pointer-events: auto !important;
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
+{% endblock %}

@@ -10,7 +10,8 @@ SECRET_KEY = 'django-insecure-3d5+$s_h8(i!+t+=3=g$a=ggth^m-4+@w*38)mp$4f0b4n_=5l
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.0.104', 'localhost', '127.0.0.1']
+
 
 # Application definition
 
@@ -99,7 +100,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # API Configuration
-INVOICE_API_BASE_URL = 'https://web-production-b4986.up.railway.app/api'  # URL base de la API de facturas
+INVOICE_API_BASE_URL = 'http://127.0.0.1:8001/api/'  # URL base de la API de facturas
 INVOICE_API_KEY = '1c1e88baaaca3ed8f54245cd21b487919b3ea9c7'
 INVOICE_API_TIMEOUT = 30  # segundos
 

@@ -1,0 +1,126 @@
+.breadcrumb-item a {
+    text-decoration: none;
+}
+.breadcrumb-item.active {
+    font-weight: bold;
+}
+.invoice-header {
+    background-color: var(--secondary-color);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: 10px;
+}
+.invoice-number-display {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+.invoice-image-container {
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    margin-bottom: 2rem;
+}
+.invoice-image {
+    width: 100%;
+    height: auto;
+}
+.detail-label {
+    font-weight: bold;
+    color: var(--secondary-color);
+}
+.detail-section {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.detail-section h3 {
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+.data-row {
+    margin-bottom: 1rem;
+}
+.json-viewer {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+}
+.action-buttons {
+    position: -webkit-sticky;
+    position: sticky;
+    bottom: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 10px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    z-index: 10;
+}
+.ocr-text {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.zoom-controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 5px;
+    padding: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+.zoom-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.zoom-btn:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+.page-selector {
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+.page-item.active .page-link {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+.page-notification {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 0.75rem;
+    border-radius: 5px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+.page-notification i {
+    font-size: 1.5rem;
+    margin-right: 0.75rem;
+}

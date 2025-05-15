@@ -1,83 +1,10 @@
 {% extends 'factuai/base.html' %}
+{% load static %}
 
-{% block title %}{{ company }} - {{ date }} - FactuAI{% endblock %}
+{% block title %}{{ empresa.nombre }} - {{ date }} - FactuAI{% endblock %}
 
 {% block extra_css %}
-<style>
-    .breadcrumb-item a {
-        text-decoration: none;
-    }
-    .breadcrumb-item.active {
-        font-weight: bold;
-    }
-    .invoice-item {
-        transition: background-color 0.2s;
-    }
-    .invoice-item:hover {
-        background-color: rgba(52, 152, 219, 0.05);
-    }
-    .day-header {
-        background-color: var(--secondary-color);
-        color: white;
-        padding: 2rem 0;
-        margin-bottom: 2rem;
-        border-radius: 10px;
-    }
-    .day-icon {
-        width: 100px;
-        height: 100px;
-        background-color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 3rem;
-        font-weight: bold;
-        color: var(--secondary-color);
-        margin-bottom: 1rem;
-    }
-    .invoice-card {
-        border-radius: 10px;
-        overflow: hidden;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .invoice-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    .invoice-header {
-        background-color: var(--primary-color);
-        color: white;
-        padding: 1rem;
-    }
-    .invoice-number {
-        font-size: 1.5rem;
-        font-weight: bold;
-    }
-    .invoice-content {
-        padding: 1.5rem;
-    }
-    .invoice-thumbnail {
-        width: 100%;
-        height: 200px;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 1rem;
-        overflow: hidden;
-    }
-    .invoice-thumbnail img {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-    }
-    .pages-badge {
-        font-size: 0.8rem;
-        margin-left: 0.5rem;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/day_detail.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -85,10 +12,10 @@
 <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{% url 'factuai:dashboard' %}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'factuai:company_list' %}">Empresas</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'factuai:company_detail' company %}">{{ company }}</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'factuai:year_detail' company year %}">{{ year }}</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'factuai:month_detail' company year month %}">{{ month }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:empresa_list' %}">Empresas</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:empresa_facturas' empresa.id %}">{{ empresa.nombre }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:year_detail' empresa.nombre year %}">{{ year }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:month_detail' empresa.nombre year month %}">{{ month }}</a></li>
         <li class="breadcrumb-item active">{{ day }}</li>
     </ol>
 </nav>
@@ -101,8 +28,11 @@
         </div>
         <h1 class="mb-2">{{ date }}</h1>
         <p class="mb-0">
-            <span class="badge bg-light text-dark">{{ company }}</span>
+            <span class="badge bg-light text-dark">{{ empresa.nombre }}</span>
             <span class="badge bg-light text-dark">{{ invoices|length }} facturas</span>
+            {% if empresa.nif %}
+            <span class="badge bg-light text-dark">NIF: {{ empresa.nif }}</span>
+            {% endif %}
         </p>
     </div>
 </div>
@@ -136,7 +66,7 @@
                         {% endif %}
                     {% endwith %}
                 </div>
-                <h5 class="mb-3">{{ company }}</h5>
+                <h5 class="mb-3">{{ empresa.nombre }}</h5>
                 <div class="mb-3">
                     {% with first_page=invoice.first_page %}
                         {% if first_page and first_page.page.invoice %}

@@ -1,0 +1,784 @@
+{% extends 'factuai/base.html' %}
+{% load static %}
+
+{% block title %}Facturas Pendientes - FactuAI{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, var(--warning-color), #f59e0b);
+        border-radius: 16px;
+        padding: 32px;
+        margin-bottom: 32px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+        position: relative;
+        overflow: hidden;
+        color: white;
+    }
+
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 300px;
+        background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='rgba(255,255,255,.075)' fill-rule='evenodd'/%3E%3C/svg%3E") repeat;
+        opacity: 0.5;
+        z-index: 0;
+    }
+
+    .page-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 16px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .page-subtitle {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        max-width: 700px;
+        position: relative;
+        z-index: 1;
+        margin-bottom: 0;
+    }
+
+    .invoice-card {
+        border: none;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-bottom: 24px;
+    }
+
+    .invoice-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    .invoice-header {
+        background-color: #f8f9fa;
+        padding: 16px 20px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .invoice-header h5 {
+        margin-bottom: 0;
+        font-weight: 600;
+        color: var(--gray-800);
+    }
+
+    .invoice-details {
+        padding: 20px;
+    }
+
+    .invoice-details .row {
+        margin-bottom: 16px;
+    }
+
+    .invoice-label {
+        font-weight: 600;
+        color: var(--gray-600);
+        margin-bottom: 4px;
+    }
+
+    .invoice-value {
+        font-weight: 500;
+        color: var(--gray-800);
+    }
+
+    .company-select {
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 1rem;
+        border: 2px solid var(--gray-300);
+        transition: all 0.3s ease;
+    }
+
+    .company-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+    }
+
+    .btn-assign {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(67, 97, 238, 0.2);
+    }
+
+    .btn-assign:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(67, 97, 238, 0.3);
+    }
+
+    .btn-create {
+        background-color: white;
+        color: var(--primary-color);
+        border: 2px solid var(--primary-color);
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-create:hover {
+        background-color: var(--primary-light);
+        transform: translateY(-2px);
+    }
+
+    .invoice-thumb {
+        width: 100%;
+        height: 200px;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background-color: #f8f9fa;
+        border-radius: 12px;
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        color: var(--gray-400);
+        margin-bottom: 24px;
+    }
+
+    .empty-state h4 {
+        font-weight: 700;
+        color: var(--gray-800);
+        margin-bottom: 16px;
+    }
+
+    .empty-state p {
+        color: var(--gray-600);
+        margin-bottom: 24px;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+
+    .pulse-animation {
+        animation: pulse 2s infinite;
+    }
+    
+    /* Estilos adicionales para asegurar que el modal funcione correctamente */
+    .modal {
+        z-index: 1060 !important;
+    }
+    
+    .modal-dialog {
+        z-index: 1070 !important;
+    }
+    
+    .modal-backdrop {
+        z-index: 1050 !important;
+    }
+    
+    .custom-modal .modal-content {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    
+    .custom-modal .modal-header {
+        background-color: var(--primary-color);
+        color: white;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+        padding: 15px 20px;
+    }
+    
+    .custom-modal .modal-header .btn-close {
+        filter: brightness(0) invert(1);
+    }
+    
+    .custom-modal .form-control:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Cabecera -->
+<div class="page-header">
+    <h1 class="page-title"><i class="fas fa-exclamation-triangle me-3"></i>Facturas Pendientes</h1>
+    <p class="page-subtitle">Estas facturas necesitan ser asignadas a una empresa. Revisa y asigna cada factura para mantener tu sistema organizado.</p>
+</div>
+
+{% if facturas %}
+<div class="row">
+    {% for factura in facturas %}
+    <div class="col-md-6 col-lg-4 invoice-card-wrapper">
+        <div class="invoice-card">
+            <div class="invoice-header d-flex justify-content-between align-items-center">
+                <h5>{{ factura.invoice_number }}</h5>
+                <div>
+                    {% if factura.duplicates_count > 1 %}
+                        <span class="badge bg-info me-2">{{ factura.duplicates_count }} páginas</span>
+                    {% endif %}
+                    <span class="badge bg-warning">Pendiente</span>
+                </div>
+            </div>
+            <div class="invoice-details">
+                <!-- Imagen de la factura -->
+                <div class="text-center mb-4">
+                    {% with first_page=factura.first_page %}
+                        {% if first_page and first_page.page.image %}
+                            <img src="{{ first_page.page.image.url }}" alt="Vista previa" class="invoice-thumb">
+                        {% else %}
+                            <div class="bg-light d-flex justify-content-center align-items-center invoice-thumb">
+                                <i class="fas fa-file-invoice fa-3x text-secondary"></i>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="invoice-label">Empresa Detectada</div>
+                        <div class="invoice-value">{{ factura.company }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="invoice-label">Fecha</div>
+                        <div class="invoice-value">{{ factura.invoice_date|date:"d/m/Y" }}</div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <div class="invoice-label">Asignar a Empresa</div>
+                        <select class="form-select company-select mb-3" data-factura-id="{{ factura.id }}" data-all-ids="{{ factura.all_ids|join:',' }}">
+                            <option value="">Seleccionar empresa...</option>
+                            {% for empresa in empresas %}
+                                <option value="{{ empresa.id }}" {% if empresa.nombre|lower == factura.company|lower %}selected{% endif %}>
+                                    {{ empresa.nombre }}{% if empresa.nif %} ({{ empresa.nif }}){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <button class="btn btn-primary btn-assign" data-factura-id="{{ factura.id }}" data-all-ids="{{ factura.all_ids|join:',' }}">
+                        <i class="fas fa-link me-2"></i>Asignar Empresa
+                    </button>
+                    <button class="btn btn-outline-primary btn-create" data-factura-id="{{ factura.id }}" data-all-ids="{{ factura.all_ids|join:',' }}" data-company-name="{{ factura.company }}">
+                        <i class="fas fa-plus me-2"></i>Crear Nueva
+                    </button>
+                </div>
+                
+                <div class="mt-3 text-end">
+                    <a href="{% url 'factuai:invoice_detail' factura.id %}" class="text-decoration-none">
+                        <i class="fas fa-eye me-1"></i>Ver Factura
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-check-circle text-success pulse-animation"></i>
+    <h4>¡No hay facturas pendientes!</h4>
+    <p>Todas tus facturas han sido correctamente asignadas a empresas. Puedes subir más facturas o revisar tus empresas existentes.</p>
+    <div class="d-flex justify-content-center gap-3">
+        <a href="{% url 'factuai:upload' %}" class="btn btn-primary">
+            <i class="fas fa-upload me-2"></i>Subir Facturas
+        </a>
+        <a href="{% url 'factuai:empresa_list' %}" class="btn btn-outline-primary">
+            <i class="fas fa-building me-2"></i>Ver Empresas
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal original (se mantiene por compatibilidad, pero no se usará) -->
+<div class="modal fade" id="crearEmpresaModal" tabindex="-1" aria-labelledby="crearEmpresaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="crearEmpresaModalLabel">Crear nueva empresa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="crearEmpresaForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="facturaIdCrear" value="">
+                    <div class="mb-3">
+                        <label for="nombreEmpresa" class="form-label">Nombre de la empresa *</label>
+                        <input type="text" class="form-control" id="nombreEmpresa" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nifEmpresa" class="form-label">NIF</label>
+                        <input type="text" class="form-control" id="nifEmpresa">
+                    </div>
+                    <div class="mb-3">
+                        <label for="direccionEmpresa" class="form-label">Dirección</label>
+                        <input type="text" class="form-control" id="direccionEmpresa">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="telefonoEmpresa" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" id="telefonoEmpresa">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="emailEmpresa" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="emailEmpresa">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="crearEmpresaBtn">Crear y asignar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Nuevo modal para crear empresa (este es el que usaremos) -->
+<div class="modal fade custom-modal" id="nuevoCrearEmpresaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Crear nueva empresa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="nuevoCrearEmpresaForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="nuevoFacturaIdCrear" value="" data-all-ids="">
+                    <div class="mb-3">
+                        <label for="nuevoNombreEmpresa" class="form-label">Nombre de la empresa *</label>
+                        <input type="text" class="form-control" id="nuevoNombreEmpresa" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nuevoNifEmpresa" class="form-label">NIF</label>
+                        <input type="text" class="form-control" id="nuevoNifEmpresa">
+                    </div>
+                    <div class="mb-3">
+                        <label for="nuevoDireccionEmpresa" class="form-label">Dirección</label>
+                        <input type="text" class="form-control" id="nuevoDireccionEmpresa">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="nuevoTelefonoEmpresa" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" id="nuevoTelefonoEmpresa">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="nuevoEmailEmpresa" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="nuevoEmailEmpresa">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="nuevoCancelarBtn">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="nuevoCrearEmpresaBtn">Crear y asignar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenedor para toasts -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Referencias a elementos
+        const nuevoCrearEmpresaModal = document.getElementById('nuevoCrearEmpresaModal');
+        const nuevoCrearEmpresaBtn = document.getElementById('nuevoCrearEmpresaBtn');
+        const nuevoCancelarBtn = document.getElementById('nuevoCancelarBtn');
+        
+        // Obtener CSRF token
+        function getCsrfToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+        
+        // Evento para abrir el nuevo modal de crear empresa
+        document.querySelectorAll('.btn-create').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const facturaId = this.getAttribute('data-factura-id');
+                const allIds = this.getAttribute('data-all-ids');
+                const companyName = this.getAttribute('data-company-name');
+                
+                // Usar el nuevo modal
+                const idElement = document.getElementById('nuevoFacturaIdCrear');
+                idElement.value = facturaId;
+                if (allIds) {
+                    idElement.setAttribute('data-all-ids', allIds);
+                }
+                document.getElementById('nuevoNombreEmpresa').value = companyName;
+                
+                // Destruir cualquier instancia previa
+                const existingModal = bootstrap.Modal.getInstance(nuevoCrearEmpresaModal);
+                if (existingModal) {
+                    existingModal.dispose();
+                }
+                
+                // Crear y abrir el nuevo modal
+                const modal = new bootstrap.Modal(nuevoCrearEmpresaModal, {
+                    backdrop: false,
+                    keyboard: true
+                });
+                modal.show();
+                
+                // Eliminar cualquier backdrop que pudiera haberse creado
+                setTimeout(() => {
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = 'auto';
+                    document.body.style.paddingRight = '0';
+                    
+                    // Asegurar que el modal sea visible y esté por encima
+                    nuevoCrearEmpresaModal.style.display = 'block';
+                    nuevoCrearEmpresaModal.style.zIndex = '1080';
+                    
+                    // Forzar el foco
+                    document.getElementById('nuevoNombreEmpresa').focus();
+                }, 100);
+                
+                return false;
+            });
+        });
+        
+        // Evento para cerrar el modal con el botón cancelar
+        if (nuevoCancelarBtn) {
+            nuevoCancelarBtn.addEventListener('click', function() {
+                const modal = bootstrap.Modal.getInstance(nuevoCrearEmpresaModal);
+                if (modal) {
+                    modal.hide();
+                } else {
+                    // Si por alguna razón no se puede obtener la instancia
+                    nuevoCrearEmpresaModal.style.display = 'none';
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = 'auto';
+                    document.body.style.paddingRight = '0';
+                }
+            });
+        }
+        
+        // Evento para asignar empresa existente
+        document.querySelectorAll('.btn-assign').forEach(button => {
+            button.addEventListener('click', function() {
+                const facturaId = this.getAttribute('data-factura-id');
+                const allIds = this.getAttribute('data-all-ids');
+                const facturaIds = allIds ? allIds.split(',') : [facturaId];
+                
+                const selectElement = document.querySelector(`.company-select[data-factura-id="${facturaId}"]`);
+                const empresaId = selectElement.value;
+                
+                if (!empresaId) {
+                    showToast('Por favor, selecciona una empresa', 'warning');
+                    return;
+                }
+                
+                // Desactivar botón durante procesamiento
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Asignando...';
+                
+                // Enviar solicitud para asignar empresa
+                fetch('{% url "factuai:asignar_empresa" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        factura_id: facturaIds,  // Enviamos array de IDs
+                        empresa_id: empresaId
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast('Empresa asignada correctamente', 'success');
+                        
+                        // Eliminar tarjeta con animación
+                        const cardWrapper = this.closest('.invoice-card-wrapper');
+                        cardWrapper.style.transition = 'all 0.5s ease';
+                        cardWrapper.style.opacity = '0';
+                        cardWrapper.style.transform = 'translateY(-20px)';
+                        
+                        setTimeout(() => {
+                            cardWrapper.remove();
+                            
+                            // Verificar si quedan facturas pendientes
+                            const remainingCards = document.querySelectorAll('.invoice-card-wrapper');
+                            if (remainingCards.length === 0) {
+                                // Mostrar estado vacío
+                                const contentContainer = document.querySelector('.page-header').parentElement;
+                                contentContainer.innerHTML = `
+                                <div class="page-header">
+                                    <h1 class="page-title"><i class="fas fa-exclamation-triangle me-3"></i>Facturas Pendientes</h1>
+                                    <p class="page-subtitle">Estas facturas necesitan ser asignadas a una empresa. Revisa y asigna cada factura para mantener tu sistema organizado.</p>
+                                </div>
+                                <div class="empty-state">
+                                    <i class="fas fa-check-circle text-success pulse-animation"></i>
+                                    <h4>¡No hay facturas pendientes!</h4>
+                                    <p>Todas tus facturas han sido correctamente asignadas a empresas. Puedes subir más facturas o revisar tus empresas existentes.</p>
+                                    <div class="d-flex justify-content-center gap-3">
+                                        <a href="{% url 'factuai:upload' %}" class="btn btn-primary">
+                                            <i class="fas fa-upload me-2"></i>Subir Facturas
+                                        </a>
+                                        <a href="{% url 'factuai:empresa_list' %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-building me-2"></i>Ver Empresas
+                                        </a>
+                                    </div>
+                                </div>
+                                `;
+                            }
+                        }, 500);
+                    } else {
+                        showToast('Error: ' + (data.error || 'No se pudo asignar la empresa'), 'danger');
+                        this.disabled = false;
+                        this.innerHTML = '<i class="fas fa-link me-2"></i>Asignar Empresa';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error al comunicarse con el servidor', 'danger');
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-link me-2"></i>Asignar Empresa';
+                });
+            });
+        });
+        
+        // Evento para crear y asignar nueva empresa (usando el NUEVO modal)
+        if (nuevoCrearEmpresaBtn) {
+            nuevoCrearEmpresaBtn.addEventListener('click', function() {
+                const facturaIdElement = document.getElementById('nuevoFacturaIdCrear');
+                const facturaId = facturaIdElement.value;
+                const allIds = facturaIdElement.getAttribute('data-all-ids');
+                const facturaIds = allIds ? allIds.split(',') : [facturaId];
+                
+                const nombre = document.getElementById('nuevoNombreEmpresa').value;
+                const nif = document.getElementById('nuevoNifEmpresa').value;
+                const direccion = document.getElementById('nuevoDireccionEmpresa').value;
+                const telefono = document.getElementById('nuevoTelefonoEmpresa').value;
+                const email = document.getElementById('nuevoEmailEmpresa').value;
+                
+                if (!nombre) {
+                    showToast('El nombre de la empresa es obligatorio', 'warning');
+                    return;
+                }
+                
+                // Desactivar botón durante procesamiento
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
+                
+                // Primero crear la empresa
+                fetch('{% url "factuai:empresa_create" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        nombre: nombre,
+                        nif: nif,
+                        direccion: direccion,
+                        telefono: telefono,
+                        email: email
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        // Luego asignar la empresa a la factura
+                        return fetch('{% url "factuai:asignar_empresa" %}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCsrfToken()
+                            },
+                            body: JSON.stringify({
+                                factura_id: facturaIds,  // Array de IDs
+                                empresa_id: data.id
+                            })
+                        });
+                    } else {
+                        throw new Error(data.error || 'Error al crear empresa');
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast('Empresa creada y asignada correctamente', 'success');
+                        
+                        // Cerrar modal
+                        const modal = bootstrap.Modal.getInstance(nuevoCrearEmpresaModal);
+                        if (modal) {
+                            modal.hide();
+                        } else {
+                            // Si por alguna razón no se puede obtener la instancia
+                            nuevoCrearEmpresaModal.style.display = 'none';
+                            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                            document.body.classList.remove('modal-open');
+                        }
+                        
+                        // Eliminar tarjeta con animación
+                        const cardWrapper = document.querySelector(`.btn-assign[data-factura-id="${facturaId}"]`).closest('.invoice-card-wrapper');
+                        cardWrapper.style.transition = 'all 0.5s ease';
+                        cardWrapper.style.opacity = '0';
+                        cardWrapper.style.transform = 'translateY(-20px)';
+                        
+                        setTimeout(() => {
+                            cardWrapper.remove();
+                            
+                            // Verificar si quedan facturas pendientes
+                            const remainingCards = document.querySelectorAll('.invoice-card-wrapper');
+                            if (remainingCards.length === 0) {
+                                // Mostrar estado vacío
+                                const contentContainer = document.querySelector('.page-header').parentElement;
+                                contentContainer.innerHTML = `
+                                <div class="page-header">
+                                    <h1 class="page-title"><i class="fas fa-exclamation-triangle me-3"></i>Facturas Pendientes</h1>
+                                    <p class="page-subtitle">Estas facturas necesitan ser asignadas a una empresa. Revisa y asigna cada factura para mantener tu sistema organizado.</p>
+                                </div>
+                                <div class="empty-state">
+                                    <i class="fas fa-check-circle text-success pulse-animation"></i>
+                                    <h4>¡No hay facturas pendientes!</h4>
+                                    <p>Todas tus facturas han sido correctamente asignadas a empresas. Puedes subir más facturas o revisar tus empresas existentes.</p>
+                                    <div class="d-flex justify-content-center gap-3">
+                                        <a href="{% url 'factuai:upload' %}" class="btn btn-primary">
+                                            <i class="fas fa-upload me-2"></i>Subir Facturas
+                                        </a>
+                                        <a href="{% url 'factuai:empresa_list' %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-building me-2"></i>Ver Empresas
+                                        </a>
+                                    </div>
+                                </div>
+                                `;
+                            }
+                        }, 500);
+                    } else {
+                        showToast('Error: ' + (data.error || 'No se pudo asignar la empresa'), 'danger');
+                        this.disabled = false;
+                        this.innerHTML = 'Crear y asignar';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('Error: ' + error.message, 'danger');
+                    this.disabled = false;
+                    this.innerHTML = 'Crear y asignar';
+                });
+            });
+        }
+        
+        // Mejora: Hacer que los selects de empresa puedan enviarse con Enter
+        document.querySelectorAll('.company-select').forEach(select => {
+            select.addEventListener('change', function() {
+                // Habilitar el botón asignar si hay una selección
+                const facturaId = this.getAttribute('data-factura-id');
+                const assignButton = document.querySelector(`.btn-assign[data-factura-id="${facturaId}"]`);
+                assignButton.disabled = !this.value;
+            });
+            
+            select.addEventListener('keypress', function(e) {
+                // Si presiona Enter y hay valor seleccionado, asignar
+                if (e.key === 'Enter' && this.value) {
+                    e.preventDefault();
+                    const facturaId = this.getAttribute('data-factura-id');
+                    const assignButton = document.querySelector(`.btn-assign[data-factura-id="${facturaId}"]`);
+                    assignButton.click();
+                }
+            });
+        });
+        
+        // Función para mostrar toast
+        function showToast(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastId = `toast-${Date.now()}`;
+            
+            // Seleccionar icono según tipo
+            let icon = 'info-circle';
+            if (type === 'success') icon = 'check-circle';
+            if (type === 'warning') icon = 'exclamation-circle';
+            if (type === 'danger') icon = 'exclamation-triangle';
+            
+            const toastHTML = `
+                <div id="${toastId}" class="toast align-items-center text-white bg-${type}" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas fa-${icon} me-2"></i> ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+            const toastElement = document.getElementById(toastId);
+            
+            const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+            toast.show();
+            
+            // Auto-eliminar después de ocultarse
+            toastElement.addEventListener('hidden.bs.toast', function () {
+                toastElement.remove();
+            });
+        }
+        
+        // Asegurarse de que no haya problemas con el z-index
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.style.zIndex = '1060';
+        });
+        
+        document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+            backdrop.style.zIndex = '1050';
+            backdrop.remove(); // Eliminar cualquier backdrop existente
+        });
+        
+        document.querySelectorAll('.modal-dialog').forEach(dialog => {
+            dialog.style.zIndex = '1070';
+        });
+        
+        // Eliminar las clases modal-open y el padding-right de body
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = 'auto';
+        document.body.style.paddingRight = '0';
+    });
+</script>
+{% endblock %}

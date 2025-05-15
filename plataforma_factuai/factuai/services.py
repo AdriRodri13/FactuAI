@@ -1,3 +1,4 @@
+# services.py (modificado)
 import os
 import uuid
 import requests
@@ -12,7 +13,6 @@ from PIL import Image, ImageEnhance
 from pdf2image import convert_from_path
 from django.conf import settings
 from django.utils.text import slugify
-from paddleocr import PaddleOCR
 
 # Deshabilitar advertencias SSL para devtunnels (solo para desarrollo)
 import urllib3
@@ -46,7 +46,6 @@ class ApiService:
         # Configurar headers básicos
         self.session.headers.update({
             'Accept': 'application/json',
-            'Content-Type': 'application/json',
             'X-API-KEY': self.api_key  # Añadir el header de autenticación
         })
         
@@ -57,32 +56,49 @@ class ApiService:
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"ApiService inicializado con base_url: {self.base_url}")
     
-    def extract_invoice_data(self, ocr_id, text_content):
-        """Envía texto OCR a la API y obtiene información estructurada"""
+    def extract_invoice_data(self, ocr_id, image_path):
+        """
+        Envía una imagen a la API para OCR y extracción de datos
+        
+        Args:
+            ocr_id: Identificador único para esta operación
+            image_path: Ruta a la imagen para procesar
+            
+        Returns:
+            dict: Datos estructurados de la factura
+        """
         try:
             # Construir URL correcta
             url = f"{self.base_url.rstrip('/')}/extraer/"
             
-            # Crear payload según el formato esperado por la API
-            payload = {
-                "texto_ocr": text_content
-            }
+            # Verificar que el archivo existe
+            if not os.path.exists(image_path):
+                self.logger.error(f"La imagen no existe en la ruta: {image_path}")
+                return self._get_fallback_data(ocr_id)
             
-            # Realizar petición con logging detallado
-            self.logger.info(f"Enviando petición a {url}")
-            self.logger.debug(f"Payload: {payload}")
-            
-            response = self.session.post(
-                url, 
-                json=payload, 
-                timeout=self.timeout
-            )
+            # Abrir el archivo para enviarlo
+            with open(image_path, 'rb') as image_file:
+                # Preparar archivo para envío multipart
+                files = {
+                    'imagen': (os.path.basename(image_path), image_file, 'image/jpeg')
+                }
+                
+                # Realizar petición con logging detallado
+                self.logger.info(f"Enviando imagen a {url}")
+                
+                # Usamos multipart/form-data para enviar archivos
+                response = self.session.post(
+                    url, 
+                    files=files,
+                    timeout=self.timeout
+                )
             
             # Registrar respuesta para depuración
             self.logger.info(f"Respuesta: {response.status_code}")
             
             if response.status_code != 200:
                 self.logger.error(f"Error en respuesta: {response.text}")
+                return self._get_fallback_data(ocr_id)
             
             # Verificar si hay error
             response.raise_for_status()
@@ -103,20 +119,24 @@ class ApiService:
             
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error en comunicación con API: {e}")
-            
-            # Simulación de datos para continuar con el flujo
-            self.logger.warning("Usando datos simulados debido al error de API")
-            return {
-                "ocr_id": ocr_id,
-                "company": "Empresa Simulada",
-                "invoice_number": f"F-{ocr_id[:8]}",
-                "invoice_date": "23/04/2025",
-                "raw_data": {
-                    "empresa": "Empresa Simulada",
-                    "numero_factura": f"F-{ocr_id[:8]}",
-                    "fecha": "23/04/2025"
-                }
+            return self._get_fallback_data(ocr_id)
+    
+    def _get_fallback_data(self, ocr_id):
+        """
+        Genera datos simulados en caso de error para no interrumpir el flujo
+        """
+        self.logger.warning("Usando datos simulados debido al error de API")
+        return {
+            "ocr_id": ocr_id,
+            "company": "Empresa Simulada",
+            "invoice_number": f"F-{ocr_id[:8]}",
+            "invoice_date": "23/04/2025",
+            "raw_data": {
+                "empresa": "Empresa Simulada",
+                "numero_factura": f"F-{ocr_id[:8]}",
+                "fecha": "23/04/2025"
             }
+        }
     
     def _normalize_api_result(self, result):
         """
@@ -151,18 +171,10 @@ class ApiService:
         return normalized
     
 class FileProcessingService:
-    """Servicio para procesar archivos subidos y extraer texto OCR"""
+    """Servicio para procesar archivos subidos y extraer páginas/imágenes"""
     
     def __init__(self):
         self.allowed_extensions = settings.ALLOWED_EXTENSIONS
-        
-        # Inicializar PaddleOCR con el idioma español
-        # Configurar según las necesidades
-        self.ocr = PaddleOCR(
-            use_angle_cls=True,  # Usar detector de ángulo 
-            lang='es',           # Idioma español
-            use_gpu=True        # Usar GPU por defecto
-        )
         
     def process_file(self, file_obj):
         """
@@ -408,29 +420,6 @@ class FileProcessingService:
                     })
         
         return image_paths
-    
-    def extract_text_from_image(self, image_path):
-        """Extrae texto de una imagen usando PaddleOCR"""
-        try:
-            logger.info(f"Extrayendo texto con PaddleOCR de: {image_path}")
-            
-            # Realizar OCR con PaddleOCR
-            result = self.ocr.ocr(image_path, cls=True)
-            
-            if not result or not result[0]:
-                logger.warning(f"PaddleOCR no detectó texto en: {image_path}")
-                return ""
-            
-            # Extraer todo el texto reconocido
-            # PaddleOCR devuelve una lista de resultados con coordenadas y texto
-            extracted_text = "\n".join([line[1][0] for line in result[0] if line[1][0]])
-            
-            logger.info(f"Texto extraído ({len(extracted_text)} caracteres)")
-            return extracted_text
-            
-        except Exception as e:
-            logger.error(f"Error en extracción OCR con PaddleOCR: {e}")
-            return ""
 
 class InvoiceProcessor:
     """Orquestador para el procesamiento completo de facturas"""
@@ -444,11 +433,10 @@ class InvoiceProcessor:
         """
         Procesa un documento de factura completo:
         1. Extrae imágenes del documento directamente en el directorio de medios
-        2. Realiza OCR en cada imagen con PaddleOCR
-        3. Envía texto OCR a la API (uno por uno)
-        4. Guarda los resultados
+        2. Envía cada imagen a la API para OCR y extracción de datos
+        3. Guarda los resultados
         """
-        from .models import InvoicePage, ExtractedInvoice, InvoiceGroup
+        from .models import InvoicePage, ExtractedInvoice, InvoiceGroup, Empresa
         
         try:
             # Verificar que el documento existe
@@ -563,19 +551,23 @@ class InvoiceProcessor:
                 
                 # Verificar que la imagen existe
                 if not os.path.exists(image_path):
-                    logger.error(f"Imagen no encontrada para OCR: {image_path}")
+                    logger.error(f"Imagen no encontrada para procesar: {image_path}")
                     continue
                 
-                # Realizar OCR con PaddleOCR
+                # Procesar la imagen con la API
                 try:
-                    # Extraer texto usando PaddleOCR
-                    ocr_text = self.file_service.extract_text_from_image(image_path)
+                    # Generar ID único para esta página
+                    ocr_id = str(uuid.uuid4())
                     
-                    # Crear página en la base de datos
+                    # Enviar la imagen a la API para obtener texto OCR y datos extraídos
+                    result = self.api_service.extract_invoice_data(ocr_id, image_path)
+                    
+                    # Crear página en la base de datos - ahora sin OCR local
                     page = InvoicePage(
                         invoice=invoice_document,
                         page_number=img_data['page_number'],
-                        ocr_text=ocr_text
+                        # Nota: ya no almacenamos texto OCR localmente, lo deja vacío
+                        ocr_text=""
                     )
                     
                     # Guardar la imagen
@@ -588,40 +580,34 @@ class InvoiceProcessor:
                     page.processed = True
                     page.save()
                     
-                    # Preparar datos para la API
-                    ocr_id = str(uuid.uuid4())
+                    # Preparar para crear ExtractedInvoice
                     ocr_items.append({
                         "ocr_id": ocr_id,
-                        "text_content": ocr_text,
+                        "result": result,
                         "page": page
                     })
                 
                 except Exception as e:
-                    logger.error(f"Error en OCR para la imagen {image_path}: {e}")
+                    logger.error(f"Error procesando la imagen {image_path}: {e}")
                     continue
             
             # Si no hay elementos para procesar, terminar
             if not ocr_items:
                 invoice_document.processed = True
-                invoice_document.processing_error = "No se pudo extraer texto de ninguna página"
+                invoice_document.processing_error = "No se pudieron procesar las imágenes"
                 invoice_document.save()
                 return
             
-            # Procesar cada texto OCR individualmente con la API
+            # Crear entradas en la base de datos con los resultados
             try:
                 # Lista para guardar facturas creadas
                 extracted_invoices = []
                 
-                # Procesar cada OCR individualmente 
+                # Procesar cada resultado 
                 for item in ocr_items:
                     try:
-                        # Llamar a la API para este ítem individualmente
-                        result = self.api_service.extract_invoice_data(
-                            item["ocr_id"], 
-                            item["text_content"]
-                        )
-                        
                         page = item["page"]
+                        result = item["result"]
                         
                         # Normalización de fecha
                         invoice_date = self.normalize_date(result.get("invoice_date", ""), result.get("raw_data", {}))
@@ -648,13 +634,26 @@ class InvoiceProcessor:
                     invoice_groups = {}
                     
                     for extracted_invoice in extracted_invoices:
-                        key = (extracted_invoice.company, extracted_invoice.invoice_number)
+                        company_name = extracted_invoice.company
+                        invoice_number = extracted_invoice.invoice_number
+                        
+                        # Buscar empresa existente por el nombre detectado
+                        empresa = Empresa.buscar_por_nombre(company_name)
+                        
+                        # Si no encuentra empresa, se usará el nombre detectado temporalmente
+                        key = (company_name, invoice_number)
                         if key not in invoice_groups:
-                            invoice_groups[key] = []
-                        invoice_groups[key].append(extracted_invoice)
+                            invoice_groups[key] = {
+                                'invoices': [],
+                                'empresa': empresa  # Puede ser None
+                            }
+                        invoice_groups[key]['invoices'].append(extracted_invoice)
                     
                     # Crear o actualizar grupos de facturas
-                    for (company, invoice_number), invoices in invoice_groups.items():
+                    for (company_name, invoice_number), data in invoice_groups.items():
+                        invoices = data['invoices']
+                        empresa = data['empresa']
+                        
                         if not invoices:
                             continue
                         
@@ -662,29 +661,54 @@ class InvoiceProcessor:
                         first_invoice = invoices[0]
                         
                         # Crear o recuperar el grupo
-                        invoice_group, created = InvoiceGroup.objects.get_or_create(
-                            company=company,
-                            invoice_number=invoice_number,
-                            defaults={
-                                'invoice_date': first_invoice.invoice_date
-                            }
-                        )
+                        try:
+                            # Si tenemos empresa, buscar por ella
+                            if empresa:
+                                invoice_group, created = InvoiceGroup.objects.get_or_create(
+                                    empresa=empresa,
+                                    invoice_number=invoice_number,
+                                    defaults={
+                                        'company': company_name,  # Mantener el nombre original
+                                        'invoice_date': first_invoice.invoice_date
+                                    }
+                                )
+                                
+                                # Si encontramos la empresa, registrar este nombre detectado
+                                empresa.add_nombre_detectado(company_name)
+                            else:
+                                # Si no hay empresa, seguir usando el campo company
+                                invoice_group, created = InvoiceGroup.objects.get_or_create(
+                                    company=company_name,
+                                    invoice_number=invoice_number,
+                                    defaults={
+                                        'invoice_date': first_invoice.invoice_date
+                                    }
+                                )
+                                
+                                # Marcar esta factura para revisión posterior (necesitará confirmar empresa)
+                                invoice_group.necesita_revision = True
+                                invoice_group.save()
+                            
+                            # Asociar todas las facturas al grupo
+                            for invoice in invoices:
+                                invoice.group = invoice_group
+                                invoice.save()
+                            
+                            logger.info(f"Factura agrupada: {company_name} - {invoice_number} con {len(invoices)} páginas")
                         
-                        # Asociar todas las facturas al grupo
-                        for invoice in invoices:
-                            invoice.group = invoice_group
-                            invoice.save()
-                        
-                        logger.info(f"Factura agrupada: {company} - {invoice_number} con {len(invoices)} páginas")
+                        except Exception as e:
+                            logger.error(f"Error al agrupar factura {company_name} - {invoice_number}: {e}")
+                            # Continuar con el siguiente grupo en caso de error
+                    
+                    # Marcar documento como procesado
+                    invoice_document.processed = True
+                    invoice_document.save()
                     
                 except Exception as e:
                     logger.error(f"Error al agrupar facturas: {e}")
-                    # No interrumpir el procesamiento si falla la agrupación
-                
-                # Marcar documento como procesado
-                invoice_document.processed = True
-                invoice_document.save()
-                
+                    invoice_document.processing_error = f"Error al agrupar facturas: {e}"
+                    invoice_document.save()
+                    
             except Exception as e:
                 logger.error(f"Error en el procesamiento general: {e}")
                 invoice_document.processing_error = f"Error en el procesamiento: {e}"
@@ -694,7 +718,6 @@ class InvoiceProcessor:
             logger.error(f"Error procesando documento {invoice_document.id}: {e}")
             invoice_document.processing_error = str(e)
             invoice_document.save()
-    
     def normalize_date(self, date_str, raw_data=None):
         """
         Normaliza diferentes formatos de fecha para obtener un objeto date válido
@@ -769,6 +792,7 @@ class InvoiceProcessor:
                 potential_year = max([int(n) for n in numbers if len(n) == 4], default=None)
                 
                 if potential_year and 2000 <= potential_year <= 2100:
+                    # Encontramos un año válido, buscar otros números para mes y día
                     # Encontramos un año válido, buscar otros números para mes y día
                     other_numbers = [int(n) for n in numbers if int(n) != potential_year]
                     

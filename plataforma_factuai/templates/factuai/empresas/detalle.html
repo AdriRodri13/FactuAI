@@ -1,0 +1,283 @@
+{% extends 'factuai/base.html' %}
+{% load static %}
+
+{% block title %}{{ empresa.nombre }} - Detalles de Empresa | FactuAI{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/empresas/detalle.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'factuai:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:empresa_list' %}">Empresas</a></li>
+        <li class="breadcrumb-item active">{{ empresa.nombre }}</li>
+    </ol>
+</nav>
+
+<!-- Cabecera -->
+<div class="company-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="company-title">{{ empresa.nombre }}</h1>
+                <div class="badges">
+                    {% if empresa.nif %}
+                    <span class="badge bg-light text-dark">NIF: {{ empresa.nif }}</span>
+                    {% endif %}
+                    <span class="badge bg-light text-dark">Creada: {{ empresa.fecha_creacion|date:"d/m/Y" }}</span>
+                </div>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+                <a href="{% url 'factuai:empresa_list' %}" class="btn btn-outline-light">
+                    <i class="fas fa-arrow-left me-2"></i>Volver a Empresas
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenido principal -->
+<div class="container">
+    <div class="company-detail-container">
+        <!-- Tarjeta de información -->
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="info-card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2 class="card-title"><i class="fas fa-building me-2"></i>Información de la Empresa</h2>
+                            <button class="btn btn-primary btn-edit-company" id="editCompanyBtn">
+                                <i class="fas fa-edit me-2"></i>Editar Información
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Modo visualización -->
+                        <div id="viewMode">
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <div class="info-group">
+                                        <div class="info-label">Nombre</div>
+                                        <div class="info-value">{{ empresa.nombre }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <div class="info-group">
+                                        <div class="info-label">NIF</div>
+                                        <div class="info-value">{{ empresa.nif|default:"No especificado" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-12 mb-4">
+                                    <div class="info-group">
+                                        <div class="info-label">Dirección</div>
+                                        <div class="info-value">{{ empresa.direccion|default:"No especificada" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <div class="info-group">
+                                        <div class="info-label">Teléfono</div>
+                                        <div class="info-value">{{ empresa.telefono|default:"No especificado" }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <div class="info-group">
+                                        <div class="info-label">Email</div>
+                                        <div class="info-value">{{ empresa.email|default:"No especificado" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <div class="info-group">
+                                        <div class="info-label">Fecha de Creación</div>
+                                        <div class="info-value">{{ empresa.fecha_creacion|date:"d/m/Y H:i" }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-4">
+                                    <div class="info-group">
+                                        <div class="info-label">Última Actualización</div>
+                                        <div class="info-value">{{ empresa.fecha_actualizacion|date:"d/m/Y H:i" }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if empresa.nombres_detectados %}
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="info-group">
+                                        <div class="info-label">Nombres Detectados</div>
+                                        <div class="info-value">
+                                            {% for nombre in empresa.nombres_detectados %}
+                                                <span class="badge bg-light text-primary mb-1 me-1">{{ nombre }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Modo edición (oculto por defecto) -->
+                        <div id="editMode" style="display: none;">
+                            <form id="editCompanyForm">
+                                {% csrf_token %}
+                                <input type="hidden" id="empresaId" value="{{ empresa.id }}">
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-4">
+                                        <div class="form-group">
+                                            <label for="editNombre" class="form-label">Nombre *</label>
+                                            <input type="text" class="form-control" id="editNombre" name="nombre" value="{{ empresa.nombre }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-4">
+                                        <div class="form-group">
+                                            <label for="editNif" class="form-label">NIF</label>
+                                            <input type="text" class="form-control" id="editNif" name="nif" value="{{ empresa.nif|default:'' }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 mb-4">
+                                        <div class="form-group">
+                                            <label for="editDireccion" class="form-label">Dirección</label>
+                                            <input type="text" class="form-control" id="editDireccion" name="direccion" value="{{ empresa.direccion|default:'' }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-4">
+                                        <div class="form-group">
+                                            <label for="editTelefono" class="form-label">Teléfono</label>
+                                            <input type="tel" class="form-control" id="editTelefono" name="telefono" value="{{ empresa.telefono|default:'' }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-4">
+                                        <div class="form-group">
+                                            <label for="editEmail" class="form-label">Email</label>
+                                            <input type="email" class="form-control" id="editEmail" name="email" value="{{ empresa.email|default:'' }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end gap-2 mt-3">
+                                    <button type="button" class="btn btn-outline-secondary" id="cancelEditBtn">
+                                        <i class="fas fa-times me-2"></i>Cancelar
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" id="saveCompanyBtn">
+                                        <i class="fas fa-save me-2"></i>Guardar Cambios
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sección de acciones -->
+        <div class="row mt-4">
+            <div class="col-lg-12">
+                <div class="actions-card">
+                    <div class="card-header">
+                        <h2 class="card-title"><i class="fas fa-cogs me-2"></i>Acciones Adicionales</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="action-item">
+                                    <a href="{% url 'factuai:empresa_list' %}" class="action-link">
+                                        <div class="action-icon">
+                                            <i class="fas fa-building"></i>
+                                        </div>
+                                        <div class="action-content">
+                                            <h3 class="action-title">Ver Todas las Empresas</h3>
+                                            <p class="action-desc">Volver al listado de todas las empresas registradas.</p>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="action-item">
+                                    <a href="{% url 'factuai:upload' %}" class="action-link">
+                                        <div class="action-icon">
+                                            <i class="fas fa-upload"></i>
+                                        </div>
+                                        <div class="action-content">
+                                            <h3 class="action-title">Subir Facturas</h3>
+                                            <p class="action-desc">Añadir nuevas facturas al sistema.</p>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-4 col-md-6 mb-4">
+                                <div class="action-item danger-action">
+                                    <a href="#" class="action-link" id="deleteCompanyBtn">
+
+                                        <div class="action-icon">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </div>
+                                        <div class="action-content">
+                                            <h3 class="action-title">Eliminar Empresa</h3>
+                                            <p class="action-desc">Eliminar permanentemente esta empresa y sus datos.</p>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Contenedor para toasts -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+<!-- Modal de confirmación para eliminar -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>¡Atención!</strong> Esta acción no se puede deshacer.
+                </div>
+                <p>¿Estás seguro de que deseas eliminar la empresa <strong>{{ empresa.nombre }}</strong>?</p>
+                <p>Esto también eliminará todas las facturas asociadas a esta empresa.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash-alt me-2"></i>Sí, eliminar empresa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js//empresas/detalle.js' %}"></script>
+{% endblock %}

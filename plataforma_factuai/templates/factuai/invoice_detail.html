@@ -1,136 +1,13 @@
 {% extends 'factuai/base.html' %}
+{% load static %}
 
-{% block title %}{% if invoice_group %}{{ invoice_group.invoice_number }}{% else %}{{ invoice.invoice_number }}{% endif %} - {{ invoice.company }} - FactuAI{% endblock %}
+{% block title %}
+{% if invoice_group %}{{ invoice_group.invoice_number }}{% else %}{{ invoice.invoice_number }}{% endif %} - 
+{% if empresa %}{{ empresa.nombre }}{% else %}{{ invoice.company }}{% endif %} - FactuAI
+{% endblock %}
 
 {% block extra_css %}
-<style>
-    .breadcrumb-item a {
-        text-decoration: none;
-    }
-    .breadcrumb-item.active {
-        font-weight: bold;
-    }
-    .invoice-header {
-        background-color: var(--secondary-color);
-        color: white;
-        padding: 2rem 0;
-        margin-bottom: 2rem;
-        border-radius: 10px;
-    }
-    .invoice-number-display {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-    .invoice-image-container {
-        width: 100%;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-        margin-bottom: 2rem;
-    }
-    .invoice-image {
-        width: 100%;
-        height: auto;
-    }
-    .detail-label {
-        font-weight: bold;
-        color: var(--secondary-color);
-    }
-    .detail-section {
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-    .detail-section h3 {
-        border-bottom: a px solid var(--primary-color);
-        padding-bottom: 0.5rem;
-        margin-bottom: 1.5rem;
-    }
-    .data-row {
-        margin-bottom: 1rem;
-    }
-    .json-viewer {
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        padding: 1rem;
-        max-height: 300px;
-        overflow-y: auto;
-        font-family: monospace;
-    }
-    .action-buttons {
-        position: -webkit-sticky;
-        position: sticky;
-        bottom: 1rem;
-        display: flex;
-        justify-content: flex-end;
-        gap: 1rem;
-        padding: 1rem;
-        background-color: rgba(255, 255, 255, 0.9);
-        border-radius: 10px;
-        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-        z-index: 10;
-    }
-    .ocr-text {
-        white-space: pre-wrap;
-        font-family: monospace;
-        font-size: 0.9rem;
-        padding: 1rem;
-        background-color: #f8f9fa;
-        border-radius: 5px;
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    .zoom-controls {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        background-color: rgba(255, 255, 255, 0.8);
-        border-radius: 5px;
-        padding: 0.5rem;
-        display: flex;
-        gap: 0.5rem;
-    }
-    .zoom-btn {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: white;
-        border: 1px solid #dee2e6;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .zoom-btn:hover {
-        background-color: var(--primary-color);
-        color: white;
-    }
-    .page-selector {
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 1.5rem;
-    }
-    .page-item.active .page-link {
-        background-color: var(--primary-color);
-        border-color: var(--primary-color);
-    }
-    .page-notification {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 0.75rem;
-        border-radius: 5px;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-    }
-    .page-notification i {
-        font-size: 1.5rem;
-        margin-right: 0.75rem;
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/invoice_detail.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -138,8 +15,14 @@
 <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{% url 'factuai:dashboard' %}">Dashboard</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'factuai:company_list' %}">Empresas</a></li>
-        <li class="breadcrumb-item"><a href="{% url 'factuai:company_detail' invoice.company %}">{{ invoice.company }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'factuai:empresa_list' %}">Empresas</a></li>
+        
+        {% if empresa %}
+            <li class="breadcrumb-item"><a href="{% url 'factuai:empresa_facturas' empresa.id %}">{{ empresa.nombre }}</a></li>
+        {% else %}
+            <li class="breadcrumb-item"><a href="{% url 'factuai:company_detail' invoice.company %}">{{ invoice.company }}</a></li>
+        {% endif %}
+        
         <li class="breadcrumb-item"><a href="{% url 'factuai:year_detail' invoice.company invoice.invoice_date|date:'Y' %}">{{ invoice.invoice_date|date:'Y' }}</a></li>
         <li class="breadcrumb-item"><a href="{% url 'factuai:month_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' %}">{{ invoice.invoice_date|date:'F'|capfirst }}</a></li>
         <li class="breadcrumb-item"><a href="{% url 'factuai:day_detail' invoice.company invoice.invoice_date|date:'Y' invoice.invoice_date|date:'n' invoice.invoice_date|date:'j' %}">{{ invoice.invoice_date|date:'j' }}</a></li>
@@ -150,12 +33,18 @@
 <!-- Cabecera de factura -->
 <div class="invoice-header text-center">
     <div class="container">
-        <h5 class="mb-1">{{ invoice.company }}</h5>
+        <h5 class="mb-1">{% if empresa %}{{ empresa.nombre }}{% else %}{{ invoice.company }}{% endif %}</h5>
         <div class="invoice-number-display">{% if invoice_group %}{{ invoice_group.invoice_number }}{% else %}{{ invoice.invoice_number }}{% endif %}</div>
         <p class="mb-0">{{ invoice.invoice_date|date:"d F, Y"|capfirst }}</p>
         {% if is_grouped and pages_count > 1 %}
         <div class="mt-2">
             <span class="badge bg-info">{{ pages_count }} páginas</span>
+        </div>
+        {% endif %}
+        
+        {% if empresa and empresa.nif %}
+        <div class="mt-2">
+            <span class="badge bg-light text-dark">NIF: {{ empresa.nif }}</span>
         </div>
         {% endif %}
     </div>
@@ -185,6 +74,30 @@
 </div>
 {% endif %}
 
+{% if not empresa %}
+<div class="alert alert-warning mb-4">
+    <div class="d-flex align-items-center">
+        <div class="flex-shrink-0">
+            <i class="fas fa-exclamation-triangle text-warning fa-2x me-3"></i>
+        </div>
+        <div class="flex-grow-1">
+            <h5 class="alert-heading mb-1">Factura sin empresa asignada</h5>
+            <p class="mb-2">
+                Esta factura no está asociada a una empresa registrada. Asociar una empresa permitirá una mejor organización.
+            </p>
+            <div class="d-flex align-items-center">
+                <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#asignarEmpresaModal">
+                    <i class="fas fa-building me-1"></i> Asignar empresa
+                </button>
+                <button class="btn btn-outline-secondary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#crearEmpresaModal">
+                    <i class="fas fa-plus me-1"></i> Crear nueva empresa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     <!-- Columna principal con imagen y detalles -->
     <div class="col-lg-8">
@@ -205,7 +118,7 @@
                 <div class="col-md-6">
                     <div class="data-row">
                         <div class="detail-label">Empresa</div>
-                        <div>{{ invoice.company }}</div>
+                        <div>{% if empresa %}{{ empresa.nombre }}{% else %}{{ invoice.company }}{% endif %}</div>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -225,7 +138,8 @@
                         <div class="detail-label">Archivo Original</div>
                         <div>{{ document.original_filename }}</div>
                     </div>
-                </div><div class="col-md-6">
+                </div>
+                <div class="col-md-6">
                     <div class="data-row">
                         <div class="detail-label">Página</div>
                         <div>{{ page.page_number }} {% if document.pages.count > 1 %}de {{ document.pages.count }}{% endif %}</div>
@@ -237,6 +151,41 @@
                         <div>{{ invoice.created_at|date:"d/m/Y H:i" }}</div>
                     </div>
                 </div>
+                
+                {% if empresa %}
+                {% if empresa.nif %}
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">NIF</div>
+                        <div>{{ empresa.nif }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if empresa.direccion %}
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Dirección</div>
+                        <div>{{ empresa.direccion }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if empresa.telefono %}
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Teléfono</div>
+                        <div>{{ empresa.telefono }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if empresa.email %}
+                <div class="col-md-6">
+                    <div class="data-row">
+                        <div class="detail-label">Email</div>
+                        <div>{{ empresa.email }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endif %}
             </div>
         </div>
         
@@ -356,61 +305,195 @@
         <i class="fas fa-calendar-day me-2"></i>Ver Día {{ invoice.invoice_date|date:'j' }}
     </a>
 </div>
+
+<!-- Modal para asignar empresa existente -->
+{% if not empresa %}
+<div class="modal fade" id="asignarEmpresaModal" tabindex="-1" aria-labelledby="asignarEmpresaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="asignarEmpresaModalLabel">Asignar a una empresa existente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="asignarEmpresaForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="facturaId" value="{% if invoice_group %}{{ invoice_group.id }}{% else %}{{ invoice.id }}{% endif %}">
+                    <div class="mb-3">
+                        <label for="empresaSelect" class="form-label">Seleccionar empresa</label>
+                        <select class="form-select" id="empresaSelect" required>
+                            <option value="" selected disabled>Selecciona una empresa...</option>
+                            {% for emp in empresas_disponibles %}
+                                <option value="{{ emp.id }}">{{ emp.nombre }}{% if emp.nif %} ({{ emp.nif }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="asignarEmpresaBtn">Asignar empresa</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para crear nueva empresa -->
+<div class="modal fade" id="crearEmpresaModal" tabindex="-1" aria-labelledby="crearEmpresaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="crearEmpresaModalLabel">Crear nueva empresa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="crearEmpresaForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="facturaIdCrear" value="{% if invoice_group %}{{ invoice_group.id }}{% else %}{{ invoice.id }}{% endif %}">
+                    <div class="mb-3">
+                        <label for="nombreEmpresa" class="form-label">Nombre de la empresa *</label>
+                        <input type="text" class="form-control" id="nombreEmpresa" value="{{ invoice.company }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nifEmpresa" class="form-label">NIF</label>
+                        <input type="text" class="form-control" id="nifEmpresa">
+                    </div>
+                    <div class="mb-3">
+                        <label for="direccionEmpresa" class="form-label">Dirección</label>
+                        <input type="text" class="form-control" id="direccionEmpresa">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="telefonoEmpresa" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" id="telefonoEmpresa">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="emailEmpresa" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="emailEmpresa">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="crearEmpresaBtn">Crear y asignar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/invoice_detail.js' %}"></script>
+
+{% if not empresa %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Funcionalidad de zoom para la imagen de factura
-        const imageContainer = document.getElementById('imageContainer');
-        const invoiceImage = document.getElementById('invoiceImage');
-        const zoomIn = document.getElementById('zoomIn');
-        const zoomOut = document.getElementById('zoomOut');
-        const resetZoom = document.getElementById('resetZoom');
-        
-        let scale = 1;
-        const maxScale = 3;
-        const minScale = 0.5;
-        const scaleStep = 0.2;
-        
-        // Función para aplicar zoom
-        function applyZoom() {
-            invoiceImage.style.transform = `scale(${scale})`;
-            invoiceImage.style.transformOrigin = 'top left';
+        // Funcionalidad para asignar empresa existente
+        const asignarEmpresaBtn = document.getElementById('asignarEmpresaBtn');
+        if (asignarEmpresaBtn) {
+            asignarEmpresaBtn.addEventListener('click', function() {
+                const empresaId = document.getElementById('empresaSelect').value;
+                const facturaId = document.getElementById('facturaId').value;
+                
+                if (!empresaId) {
+                    alert('Por favor, selecciona una empresa');
+                    return;
+                }
+                
+                // Enviar solicitud para asignar empresa
+                fetch('{% url "factuai:asignar_empresa" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrftoken]').value
+                    },
+                    body: JSON.stringify({
+                        factura_id: facturaId,
+                        empresa_id: empresaId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al asignar empresa');
+                });
+            });
         }
         
-        // Zoom in
-        zoomIn.addEventListener('click', function() {
-            if (scale < maxScale) {
-                scale += scaleStep;
-                applyZoom();
-            }
-        });
-        
-        // Zoom out
-        zoomOut.addEventListener('click', function() {
-            if (scale > minScale) {
-                scale -= scaleStep;
-                applyZoom();
-            }
-        });
-        
-        // Reset zoom
-        resetZoom.addEventListener('click', function() {
-            scale = 1;
-            applyZoom();
-        });
-        
-        // Formatear JSON para mejor visualización
-        const jsonViewer = document.getElementById('jsonViewer');
-        if (jsonViewer) {
-            try {
-                const jsonData = JSON.parse(jsonViewer.querySelector('pre').textContent);
-                jsonViewer.querySelector('pre').textContent = JSON.stringify(jsonData, null, 2);
-            } catch (e) {
-                // Si no es un JSON válido, dejarlo como está
-            }
-        }
-    });
+        // Funcionalidad para crear y asignar nueva empresa
+       const crearEmpresaBtn = document.getElementById('crearEmpresaBtn');
+       if (crearEmpresaBtn) {
+           crearEmpresaBtn.addEventListener('click', function() {
+               const nombre = document.getElementById('nombreEmpresa').value;
+               const nif = document.getElementById('nifEmpresa').value;
+               const direccion = document.getElementById('direccionEmpresa').value;
+               const telefono = document.getElementById('telefonoEmpresa').value;
+               const email = document.getElementById('emailEmpresa').value;
+               const facturaId = document.getElementById('facturaIdCrear').value;
+               
+               if (!nombre) {
+                   alert('El nombre de la empresa es obligatorio');
+                   return;
+               }
+               
+               // Primero crear la empresa
+               fetch('{% url "factuai:empresa_create" %}', {
+                   method: 'POST',
+                   headers: {
+                       'Content-Type': 'application/json',
+                       'X-CSRFToken': document.querySelector('[name=csrftoken]').value
+                   },
+                   body: JSON.stringify({
+                       nombre: nombre,
+                       nif: nif,
+                       direccion: direccion,
+                       telefono: telefono,
+                       email: email
+                   })
+               })
+               .then(response => response.json())
+               .then(data => {
+                   if (data.success) {
+                       // Luego asignar la empresa a la factura
+                       return fetch('{% url "factuai:asignar_empresa" %}', {
+                           method: 'POST',
+                           headers: {
+                               'Content-Type': 'application/json',
+                               'X-CSRFToken': document.querySelector('[name=csrftoken]').value
+                           },
+                           body: JSON.stringify({
+                               factura_id: facturaId,
+                               empresa_id: data.id
+                           })
+                       });
+                   } else {
+                       throw new Error(data.error || 'Error al crear empresa');
+                   }
+               })
+               .then(response => response.json())
+               .then(data => {
+                   if (data.success) {
+                       window.location.reload();
+                   } else {
+                       alert('Error: ' + data.error);
+                   }
+               })
+               .catch(error => {
+                   console.error('Error:', error);
+                   alert('Error: ' + error.message);
+               });
+           });
+       }
+   });
 </script>
+{% endif %}
 {% endblock %}
